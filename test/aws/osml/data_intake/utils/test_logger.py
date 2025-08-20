@@ -1,4 +1,4 @@
-#  Copyright 2024 Amazon.com, Inc. or its affiliates.
+#  Copyright 2024-2025 Amazon.com, Inc. or its affiliates.
 
 import logging
 import unittest
@@ -42,7 +42,7 @@ class TestLambdaLogger(unittest.TestCase):
         """
         Test the configure_logger function.
         """
-        from pythonjsonlogger.jsonlogger import JsonFormatter
+        from pythonjsonlogger.json import JsonFormatter
 
         from aws.osml.data_intake.utils.logger import AsyncContextFilter, configure_logger
 

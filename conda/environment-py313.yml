@@ -4,6 +4,7 @@ name: osml_data_intake
 channels:
   - conda-forge
 dependencies:
+  - conda-forge::python=3.13.1
   - conda-forge::boto3=1.40.13
   - conda-forge::gdal=3.11.3
   - conda-forge::proj=9.6.2

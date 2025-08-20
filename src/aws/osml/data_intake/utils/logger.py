@@ -1,10 +1,10 @@
-#  Copyright 2023-2024 Amazon.com, Inc. or its affiliates.
+#  Copyright 2023-2025 Amazon.com, Inc. or its affiliates.
 
 import contextvars
 import logging
 from typing import List, Optional
 
-from pythonjsonlogger.jsonlogger import JsonFormatter
+from pythonjsonlogger.json import JsonFormatter
 
 _LOG_CONTEXT = contextvars.ContextVar("_LOG_CONTEXT", default={})
 
