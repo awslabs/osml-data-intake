@@ -1,6 +1,6 @@
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.5.0
+    rev: v6.0.0
     hooks:
       - id: check-yaml
       - id: end-of-file-fixer
@@ -14,7 +14,7 @@ repos:
         types: [file, python]
 
   - repo: https://github.com/PyCQA/isort
-    rev: 5.13.2
+    rev: 6.0.1
     hooks:
       - id: isort
         args: ["--line-length=125", "--profile=black"]
@@ -28,13 +28,13 @@ repos:
         types: [file, python]
 
   - repo: https://github.com/hhatto/autopep8
-    rev: v2.0.4
+    rev: v2.3.2
     hooks:
       - id: autopep8
         types: [file, python]
 
   - repo: https://github.com/aws-samples/automated-security-helper
-    rev: '1.1.0-e-01Dec2023' # update with the latest tagged version in the repository
+    rev: 'v3.0.0' # update with the latest tagged version in the repository
     hooks:
       - id: ash
         stages: [ manual ]

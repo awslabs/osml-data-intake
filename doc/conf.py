@@ -1,42 +1,4 @@
 import datetime
-import os
-import shutil
-
-from sphinx.ext import apidoc
-
-
-def run_apidoc(app):
-    """Generate doc stubs using sphinx-apidoc."""
-    module_dir = os.path.join(app.srcdir, "../src/aws")
-    output_dir = os.path.join(app.srcdir, "_apidoc")
-    template_dir = os.path.join(app.srcdir, "_templates")
-    excludes = []
-
-    # Ensure that any stale apidoc files are cleaned up first.
-    if os.path.exists(output_dir):
-        shutil.rmtree(output_dir)
-
-    cmd = [
-        "--separate",
-        "--module-first",
-        "--doc-project=API Reference",
-        "--implicit-namespaces",
-        "--maxdepth=4",
-        "-t",
-        template_dir,
-        "-o",
-        output_dir,
-        module_dir,
-    ]
-    cmd.extend(excludes)
-    print(f"Running apidoc with options: {cmd}")
-    apidoc.main(cmd)
-
-
-def setup(app):
-    """Register our sphinx-apidoc hook."""
-    app.connect("builder-inited", run_apidoc)
-
 
 # Configuration file for the Sphinx documentation builder.
 #
@@ -56,7 +18,6 @@ author = "Amazon Web Services"
 extensions = [
     "autoapi.extension",
     "sphinx.ext.intersphinx",
-    #    "sphinx.ext.napoleon",
     "sphinx.ext.todo",
     "sphinx.ext.viewcode",
     "sphinx_rtd_theme",
@@ -72,7 +33,7 @@ autodoc_member_order = "bysource"
 default_role = "py:obj"
 
 templates_path = ["_templates"]
-exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "_apidoc"]
 
 # A string that determines how domain objects (e.g. functions, classes,
 # attributes, etc.) are displayed in their table of contents entry.

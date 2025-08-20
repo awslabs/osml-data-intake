@@ -1,4 +1,4 @@
-#  Copyright 2024 Amazon.com, Inc. or its affiliates.
+#  Copyright 2024-2025 Amazon.com, Inc. or its affiliates.
 
 import json
 import os
@@ -88,14 +88,18 @@ class ImageData:
         Calculate the bounding box (bbox) for a GeoJSON polygon.
 
         :returns: None
+
         Example of polygon format:
-        polygon = [[
-            [100.0, 0.0],    # First vertex
-            [101.0, 0.0],    # Second vertex
-            [101.0, 1.0],    # Third vertex
-            [100.0, 1.0],    # Fourth vertex
-            [100.0, 0.0]     # Closing vertex (same as first vertex)
-        ]]
+
+        .. code-block:: python
+
+            polygon = [[
+                [100.0, 0.0],    # First vertex
+                [101.0, 0.0],    # Second vertex
+                [101.0, 1.0],    # Third vertex
+                [100.0, 1.0],    # Fourth vertex
+                [100.0, 0.0]     # Closing vertex (same as first vertex)
+            ]]
         """
         coords = self.geo_polygon[0]
         min_lon = min(coord[0] for coord in coords)
@@ -157,7 +161,7 @@ class ImageData:
         logger.info(f"Calculating image statistics for {self.source_file}")
         start_time = time.perf_counter()
         temp_ds = gdal.Open(self.source_file)
-        gdal.Info(temp_ds, stats=True, approxStats=True, computeMinMax=True, reportHistograms=True)
+        gdal.Info(temp_ds, stats=True, computeMinMax=True, reportHistograms=True)
         del temp_ds
         end_time = time.perf_counter()
         logger.info(f"Generated aux file, {aux_file} in {end_time - start_time} seconds")

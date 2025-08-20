@@ -29,7 +29,7 @@ RUN wget -c ${MINICONDA_URL} && \
     ln -s /opt/conda/etc/profile.d/conda.sh /etc/profile.d/conda.sh
 
 # Copy the conda environment file
-COPY conda/environment.yml environment.yml
+COPY conda/environment-py313.yml environment.yml
 
 # Accept Conda TOS before creating the environment
 RUN conda config --set always_yes true && \

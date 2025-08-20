@@ -1,6 +1,5 @@
-#  Copyright 2024 Amazon.com, Inc. or its affiliates.
+#  Copyright 2024-2025 Amazon.com, Inc. or its affiliates.
 
-import asyncio
 import json
 import unittest
 from unittest.mock import AsyncMock, patch
@@ -52,7 +51,7 @@ class TestIngestProcessor(unittest.TestCase):
         self.s3.create_bucket(Bucket="test-bucket")
 
     @patch("stac_fastapi.opensearch.database_logic.DatabaseLogic.check_collection_exists", new_callable=AsyncMock)
-    @patch("stac_fastapi.opensearch.database_logic.DatabaseLogic.prep_create_item", new_callable=AsyncMock)
+    @patch("stac_fastapi.opensearch.database_logic.DatabaseLogic.async_prep_create_item", new_callable=AsyncMock)
     @patch("stac_fastapi.opensearch.database_logic.DatabaseLogic.create_item", new_callable=AsyncMock)
     def test_handler_success(self, mock_create_item, mock_check_collection, mock_prep_item):
         """
@@ -60,12 +59,10 @@ class TestIngestProcessor(unittest.TestCase):
         """
         from aws.osml.data_intake.ingest_processor import handler
 
-        mock_check_collection.return_value = asyncio.Future()
-        mock_check_collection.return_value.set_result(None)  # Simulate success
-        mock_prep_item.return_value = asyncio.Future()
-        mock_prep_item.return_value.set_result(Item(**json.loads(mock_message)))  # Simulate success
-        mock_create_item.return_value = asyncio.Future()
-        mock_create_item.return_value.set_result(None)  # Simulate success
+        # Set up async mock return values directly
+        mock_check_collection.return_value = None
+        mock_prep_item.return_value = Item(**json.loads(mock_message))
+        mock_create_item.return_value = None
 
         event = self.sns_event()
         response = handler(event, None)
@@ -74,7 +71,7 @@ class TestIngestProcessor(unittest.TestCase):
         self.assertIn("successfully", json.loads(response["body"]))
 
     @patch("stac_fastapi.opensearch.database_logic.DatabaseLogic.check_collection_exists", new_callable=AsyncMock)
-    @patch("stac_fastapi.opensearch.database_logic.DatabaseLogic.prep_create_item", new_callable=AsyncMock)
+    @patch("stac_fastapi.opensearch.database_logic.DatabaseLogic.async_prep_create_item", new_callable=AsyncMock)
     @patch("stac_fastapi.opensearch.database_logic.DatabaseLogic.create_item", new_callable=AsyncMock)
     def test_handler_failure(self, mock_create_item, mock_check_collection, mock_prep_item):
         """
@@ -82,10 +79,9 @@ class TestIngestProcessor(unittest.TestCase):
         """
         from aws.osml.data_intake.ingest_processor import handler
 
-        mock_check_collection.return_value = asyncio.Future()
-        mock_check_collection.return_value.set_result(None)  # Simulate success
-        mock_prep_item.return_value = asyncio.Future()
-        mock_prep_item.return_value.set_result(Item(**json.loads(mock_message)))  # Simulate success
+        # Set up async mock return values directly
+        mock_check_collection.return_value = None
+        mock_prep_item.return_value = Item(**json.loads(mock_message))
 
         mock_create_item.side_effect = Exception("Database error")
 

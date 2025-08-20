@@ -1,4 +1,4 @@
-# Copyright 2024 Amazon.com, Inc. or its affiliates.
+# Copyright 2024-2025 Amazon.com, Inc. or its affiliates.
 
 import asyncio
 import json
@@ -52,7 +52,7 @@ class IngestProcessor(ProcessorBase):
             except NotFoundError:
                 logger.info(f"{collection_id} collection not found. Creating minimal collection.")
                 await self.create_minimal_collection(collection_id)
-            prepped_item = await self.database.prep_create_item(self.stac_item, "")
+            prepped_item = await self.database.async_prep_create_item(self.stac_item, "")
             logger.info(f"Prepped data: {prepped_item}")
             await self.database.create_item(prepped_item)
 
@@ -83,4 +83,4 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
     # Log the event payload to see the raw SNS message
     message = event["Records"][0]["Sns"]["Message"]
-    return asyncio.get_event_loop().run_until_complete(IngestProcessor(message).process())
+    return asyncio.run(IngestProcessor(message).process())
