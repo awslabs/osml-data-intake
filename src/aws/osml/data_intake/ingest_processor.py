@@ -4,7 +4,7 @@ import asyncio
 import json
 from typing import Any, Dict
 
-from stac_fastapi.opensearch.database_logic import DatabaseLogic
+from stac_fastapi.opensearch.database_logic import DatabaseLogic, create_collection_index
 from stac_fastapi.types.errors import NotFoundError
 from stac_fastapi.types.stac import Collection, Item
 
@@ -69,6 +69,9 @@ class IngestProcessor(ProcessorBase):
             return self.failure_message(error)
 
     async def create_minimal_collection(self, collection_id: str) -> None:
+        # Ensure proper collection index exists with correct mapping (idempotent)
+        await create_collection_index()
+        # Create collection
         collection = Collection(**get_minimal_collection_dict(collection_id))
         await self.database.create_collection(collection)
 
