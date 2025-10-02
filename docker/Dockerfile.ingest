@@ -1,15 +1,14 @@
-# Copyright 2024 Amazon.com, Inc. or its affiliates.
+# Copyright 2024-2025 Amazon.com, Inc. or its affiliates.
 
-FROM public.ecr.aws/lambda/python:3.11 as ingest
+FROM public.ecr.aws/lambda/python:3.13 AS ingest
 
-# Install yum deps
-RUN yum -y upgrade && \
-    yum -y install gcc ca-certificates && \
-    yum clean all && \
-    rm -rf /var/cache/yum
+RUN dnf -y upgrade && \
+    dnf -y install gcc ca-certificates && \
+    dnf clean all && \
+    rm -rf /var/cache/dnf
 
-# Install python deps deps
-RUN pip3 install --no-cache-dir stac_fastapi.opensearch stac_fastapi.types python-json-logger
+COPY docker/requirements-ingest.txt ./requirements.txt
+RUN pip3 install --no-cache-dir -r requirements.txt
 
 # Copy the function code to the LAMBDA_TASK_ROOT directory
 ADD . ${LAMBDA_TASK_ROOT}

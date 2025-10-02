@@ -10,6 +10,7 @@ from stac_fastapi.types.stac import Collection, Item
 
 from .managers import SNSManager
 from .processor_base import ProcessorBase
+from .stac_validator import StacValidationError, validate_stac_item
 from .utils import AsyncContextFilter, ServiceConfig, get_minimal_collection_dict, logger
 
 
@@ -36,10 +37,13 @@ class IngestProcessor(ProcessorBase):
         Process the incoming SNS message, download and process the image, and publish the results.
 
         :returns: A response indicating the status of the process.
-        :raises Exception: Raised if there is an error during item ingestion.
         """
         try:
-            # Here we assume 'item' includes necessary fields like 'id'
+            logger.info(self.stac_item)
+            validate_stac_item(self.stac_item)
+        except StacValidationError as err:
+            return self.failure_message(f"Invalid STAC item: {err}")
+        try:
             item_id = self.stac_item["id"]
             AsyncContextFilter.set_context({"item_id": item_id})
             collection_id = self.stac_item["collection"]
