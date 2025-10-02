@@ -1,0 +1,6 @@
+# Copyright 2025 Amazon.com, Inc. or its affiliates.
+stac-fastapi.types==6.0.0
+stac-fastapi.opensearch==6.3.0
+pystac[validation]==1.8.3
+jsonschema>=4.0.1,<4.18
+python-json-logger==3.3.0

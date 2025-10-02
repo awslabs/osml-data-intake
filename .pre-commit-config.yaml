@@ -52,6 +52,7 @@ repos:
             ^\..+|
             .+\.md|
             test/data/.*|
+            src/aws/osml/data_intake/schemas/.*|
             LICENSE|
             tox.ini|
             pyproject.toml|
@@ -69,6 +70,7 @@ repos:
             ^\..+|
             .+\.md|
             test/data/.*|
+            src/aws/osml/data_intake/schemas/.*|
             LICENSE|
             tox.ini|
             pyproject.toml|
