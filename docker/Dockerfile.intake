@@ -1,6 +1,6 @@
 # Copyright 2024-2025 Amazon.com, Inc. or its affiliates.
 
-FROM public.ecr.aws/lambda/python:3.11 AS build
+FROM public.ecr.aws/lambda/python:3.13 AS build
 
 # Build time arguments
 ARG BUILD_CERT=/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
@@ -10,26 +10,25 @@ ARG MINICONDA_URL=https://repo.anaconda.com/miniconda/${MINICONDA_VERSION}.sh
 ARG CONDA_ENV_NAME="osml_data_intake"
 
 # Define required packages to install - including build tools
-ARG PACKAGES="wget curl gcc gcc-c++ make cmake pkgconfig openssl-devel libffi-devel"
+ARG PACKAGES="wget gcc gcc-c++ make cmake pkgconfig openssl-devel libffi-devel"
 
 # Give sudo permissions
 USER root
 
 # Configure, update, and refresh yum environment
-RUN yum -y upgrade && \
-    yum clean all && \
-    rm -rf /var/cache/yum
+RUN dnf -y upgrade && \
+    dnf clean all && \
+    rm -rf /var/cache/dnf
 
 # Install all our dependencies including build tools
-RUN yum groupinstall -y "Development Tools" && \
-    yum install -y $PACKAGES
+RUN dnf install -y $PACKAGES
 
 # Install Rust for packages that require it (like orjson)
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 ENV PATH="/root/.cargo/bin:${PATH}"
 
 # Clean up after installing $PACKAGES
-RUN rm -rf /var/cache/yum
+RUN rm -rf /var/cache/dnf
 
 # Install Miniconda
 RUN wget -c ${MINICONDA_URL} && \
@@ -58,7 +57,7 @@ RUN conda env create -n ${CONDA_ENV_NAME} --file environment.yml && \
     rm -rf /opt/conda/pkgs
 
 # Stage 2: Runtime environment
-FROM public.ecr.aws/lambda/python:3.11 AS intake
+FROM public.ecr.aws/lambda/python:3.13 AS intake
 
 # Copy the prebuilt conda installation + env
 COPY --from=build /opt/conda /opt/conda
@@ -72,7 +71,7 @@ ENV PYTHONPATH=/opt/conda/envs/${CONDA_ENV_NAME}/bin
 COPY --from=build /opt/conda /opt/conda
 RUN ln -s /opt/conda/etc/profile.d/conda.sh /etc/profile.d/conda.sh
 
-RUN rm -rf /var/lang/bin/python3.11 && ln -sf /opt/conda/envs/${CONDA_ENV_NAME}/bin/python /var/lang/bin/python3.11
+RUN rm -rf /var/lang/bin/python3.13 && ln -sf /opt/conda/envs/${CONDA_ENV_NAME}/bin/python /var/lang/bin/python3.13
 
 # Clean up any dangling conda resources
 RUN conda clean -afy
@@ -81,7 +80,7 @@ RUN conda clean -afy
 ADD . ${LAMBDA_TASK_ROOT}
 
 # Install the lambda manager into the conda python
-RUN python3.11 -m pip install --no-cache-dir awslambdaric
+RUN python3.13 -m pip install --no-cache-dir awslambdaric
 
 # Set environment variables for better compilation
 ENV CC=gcc
@@ -90,7 +89,7 @@ ENV LDFLAGS="-L/usr/lib64"
 ENV CPPFLAGS="-I/usr/include"
 
 # Install the package into the base image
-RUN python3.11 -m pip install --no-cache-dir --verbose .
+RUN python3.13 -m pip install --no-cache-dir --verbose .
 
 # Set entry point
 CMD ["aws.osml.data_intake.image_processor.handler"]
