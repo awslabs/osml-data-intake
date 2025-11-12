@@ -1,0 +1,22 @@
+{
+  "projectName": "DataIntake",
+  "account": {
+    "id": "123456789012",
+    "region": "us-west-2",
+    "prodLike": false,
+    "isAdc": false
+  },
+  "networkConfig": {
+    "VPC_NAME": "data-intake-vpc"
+  },
+  "dataplaneConfig": {
+    "BUILD_FROM_SOURCE": false,
+    "CONTAINER_URI": "awsosml/osml-data-intake-intake:latest",
+    "LAMBDA_FUNCTION_NAME": "DataIntakeFunction",
+    "LAMBDA_MEMORY_SIZE": 1024,
+    "LAMBDA_TIMEOUT": 900,
+    "S3_OUTPUT_BUCKET_NAME": "data-intake-output",
+    "SNS_INPUT_TOPIC_NAME": "data-intake-input",
+    "SNS_STAC_TOPIC_NAME": "data-intake-stac-output"
+  }
+}
