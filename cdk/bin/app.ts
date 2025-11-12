@@ -7,6 +7,7 @@
 import { App } from "aws-cdk-lib";
 
 import { DataIntakeStack } from "../lib/data-intake-stack";
+import { DataCatalogStack } from "../lib/data-catalog-stack";
 import { NetworkStack } from "../lib/network-stack";
 import { loadDeployment } from "./deployment/load-deployment";
 
@@ -39,5 +40,17 @@ const dataIntakeStack = new DataIntakeStack(app, `${deployment.projectName}-Data
   terminationProtection: deployment.account.prodLike
 });
 
-// Ensure the data intake stack depends on the network stack
+// Create the data catalog stack
+const dataCatalogStack = new DataCatalogStack(app, `${deployment.projectName}-DataCatalog`, {
+  account: deployment.account,
+  vpc: networkStack.vpc,
+  env: {
+    account: deployment.account.id,
+    region: deployment.account.region
+  },
+  terminationProtection: deployment.account.prodLike
+});
+
+// Ensure stacks depend on the network stack
 dataIntakeStack.addDependency(networkStack);
+dataCatalogStack.addDependency(networkStack);

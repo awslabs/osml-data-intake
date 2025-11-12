@@ -35,6 +35,7 @@ import { existsSync, readFileSync } from "fs";
 import { join } from "path";
 
 import { DataIntakeConfig } from "../../lib/data-intake-stack";
+import { DataCatalogConfig } from "../../lib/data-catalog-stack";
 import { NetworkConfig } from "../../lib/network-stack";
 import { Account } from "../../lib/constructs/shared/osml-account";
 
@@ -50,6 +51,8 @@ export interface DeploymentConfig {
   networkConfig?: NetworkConfig;
   /** Data intake specific configuration. */
   dataplaneConfig?: DataIntakeConfig;
+  /** Data catalog specific configuration. */
+  dataCatalogConfig?: DataCatalogConfig;
 }
 
 /**
@@ -214,6 +217,18 @@ export function loadDeploymentConfig(): DeploymentConfig {
     );
   }
 
+  // Parse optional data catalog configuration
+  let dataCatalogConfig: DataCatalogConfig | undefined = undefined;
+  if (
+    parsedObj.dataCatalogConfig &&
+    typeof parsedObj.dataCatalogConfig === "object" &&
+    parsedObj.dataCatalogConfig !== null
+  ) {
+    dataCatalogConfig = new DataCatalogConfig(
+      parsedObj.dataCatalogConfig as Record<string, unknown>
+    );
+  }
+
   // Log configuration (only once to prevent duplicate logging)
   const globalObj = global as { __dataIntakeDeploymentConfigLoaded?: boolean };
   if (!globalObj.__dataIntakeDeploymentConfigLoaded) {
@@ -227,7 +242,8 @@ export function loadDeploymentConfig(): DeploymentConfig {
     projectName,
     account,
     networkConfig,
-    dataplaneConfig
+    dataplaneConfig,
+    dataCatalogConfig
   };
 }
 
