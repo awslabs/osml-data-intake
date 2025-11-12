@@ -4,8 +4,16 @@
 
 import { RemovalPolicy } from "aws-cdk-lib";
 import { ISecurityGroup, SecurityGroup } from "aws-cdk-lib/aws-ec2";
-import { AnyPrincipal, CfnServiceLinkedRole, PolicyStatement } from "aws-cdk-lib/aws-iam";
-import { Domain, EngineVersion, TLSSecurityPolicy } from "aws-cdk-lib/aws-opensearchservice";
+import {
+  AnyPrincipal,
+  CfnServiceLinkedRole,
+  PolicyStatement
+} from "aws-cdk-lib/aws-iam";
+import {
+  Domain,
+  EngineVersion,
+  TLSSecurityPolicy
+} from "aws-cdk-lib/aws-opensearchservice";
 import { Construct } from "constructs";
 
 import { Account } from "../shared/osml-account";
@@ -68,19 +76,24 @@ export class DCOpenSearchDomain extends Construct {
       allowAllOutbound: true
     });
 
+    // Get available subnets and determine AZ count
+    const availableSubnets = props.vpc.selectedSubnets.subnets;
+    const azCount = Math.min(availableSubnets.length, 2); // Use max 2 AZs for compatibility
+    const dataNodes = azCount * 2; // 2 nodes per AZ
+
     // Create OpenSearch domain
     this.domain = new Domain(this, id, {
       version: EngineVersion.OPENSEARCH_2_11,
       capacity: {
-        dataNodes: 4,
+        dataNodes: dataNodes,
         dataNodeInstanceType: "r5.large.search"
       },
       ebs: {
         volumeSize: 10
       },
       zoneAwareness: {
-        enabled: true,
-        availabilityZoneCount: 3
+        enabled: azCount > 1,
+        availabilityZoneCount: azCount > 1 ? azCount : undefined
       },
       nodeToNodeEncryption: true,
       encryptionAtRest: {

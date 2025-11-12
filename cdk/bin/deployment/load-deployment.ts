@@ -34,10 +34,10 @@
 import { existsSync, readFileSync } from "fs";
 import { join } from "path";
 
-import { DataIntakeConfig } from "../../lib/data-intake-stack";
-import { DataCatalogConfig } from "../../lib/data-catalog-stack";
-import { NetworkConfig } from "../../lib/network-stack";
 import { Account } from "../../lib/constructs/shared/osml-account";
+import { DataCatalogConfig } from "../../lib/data-catalog-stack";
+import { DataIntakeConfig } from "../../lib/data-intake-stack";
+import { NetworkConfig } from "../../lib/network-stack";
 
 /**
  * Represents the deployment configuration specific to data intake.
@@ -59,7 +59,10 @@ export interface DeploymentConfig {
  * Validation error class for deployment configuration issues.
  */
 class DeploymentConfigError extends Error {
-  constructor(message: string, public field?: string) {
+  constructor(
+    message: string,
+    public field?: string
+  ) {
     super(message);
     this.name = "DeploymentConfigError";
   }
@@ -118,9 +121,15 @@ function validateAccountId(accountId: string): string {
  * Validates AWS region format.
  */
 function validateRegion(region: string): string {
-  if (!/^[a-z0-9]+-[a-z0-9]+(?:-[a-z0-9]+)*$/.test(region)) {
+  // AWS regions follow strict pattern: 2-3 letter geo code, dash, direction, dash, number
+  // Examples: us-east-1, eu-west-2, ap-southeast-1, ca-central-1, me-south-1
+  if (
+    !/^(us|eu|ap|ca|sa|af|me|il|cn|gov)-(east|west|north|south|central|southeast|northeast|southwest|northwest)-[1-9]\d*$/.test(
+      region
+    )
+  ) {
     throw new DeploymentConfigError(
-      `Invalid AWS region format: '${region}'. Must follow pattern like 'us-east-1', 'eu-west-2', etc.`,
+      `Invalid AWS region format: '${region}'. Must follow AWS region pattern like 'us-east-1', 'eu-west-2', etc.`,
       "account.region"
     );
   }
@@ -181,7 +190,7 @@ export function loadDeploymentConfig(): DeploymentConfig {
 
   // Validate project name
   const projectName = validateStringField(parsedObj.projectName, "projectName");
-  
+
   // Handle isAdc field
   const isAdc = (accountObj.isAdc as boolean | undefined) ?? false;
 

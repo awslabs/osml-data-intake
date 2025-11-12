@@ -14,8 +14,8 @@ import { Account } from "../shared/osml-account";
 import { Container } from "../shared/osml-container";
 import { OSMLVpc } from "../shared/osml-vpc";
 import { BaseConfig, ConfigType } from "../shared/utils/base-config";
-import { DCLambdaRole } from "./roles/dc-lambda-role";
 import { DCOpenSearchDomain } from "./dc-opensearch-domain";
+import { DCLambdaRole } from "./roles/dc-lambda-role";
 
 /**
  * Configuration class for DCDataplane Construct.
@@ -218,7 +218,7 @@ export class DCDataplane extends Construct {
    */
   constructor(scope: Construct, id: string, props: DCDataplaneProps) {
     super(scope, id);
-    
+
     // Setup class from base properties
     this.setup(props);
 
@@ -277,19 +277,23 @@ export class DCDataplane extends Construct {
     );
 
     // Define ingest Lambda function
-    this.ingestLambdaFunction = new DockerImageFunction(this, "IngestFunction", {
-      code: this.ingestContainer.dockerImageCode,
-      timeout: Duration.seconds(this.config.LAMBDA_TIMEOUT),
-      functionName: this.config.LAMBDA_INGEST_FUNCTION_NAME,
-      environment: {
-        OPENSEARCH_ENDPOINT: this.openSearchDomain.domain.domainEndpoint
-      },
-      memorySize: this.config.LAMBDA_MEMORY_SIZE,
-      ephemeralStorageSize: Size.gibibytes(10),
-      vpc: props.vpc.vpc,
-      vpcSubnets: props.vpc.selectedSubnets,
-      role: this.lambdaRole
-    });
+    this.ingestLambdaFunction = new DockerImageFunction(
+      this,
+      "IngestFunction",
+      {
+        code: this.ingestContainer.dockerImageCode,
+        timeout: Duration.seconds(this.config.LAMBDA_TIMEOUT),
+        functionName: this.config.LAMBDA_INGEST_FUNCTION_NAME,
+        environment: {
+          OPENSEARCH_ENDPOINT: this.openSearchDomain.domain.domainEndpoint
+        },
+        memorySize: this.config.LAMBDA_MEMORY_SIZE,
+        ephemeralStorageSize: Size.gibibytes(10),
+        vpc: props.vpc.vpc,
+        vpcSubnets: props.vpc.selectedSubnets,
+        role: this.lambdaRole
+      }
+    );
 
     // Add ingress rule from ingest function to OpenSearch
     this.openSearchDomain.securityGroup.addIngressRule(

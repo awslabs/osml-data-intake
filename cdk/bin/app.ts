@@ -6,8 +6,8 @@
 
 import { App } from "aws-cdk-lib";
 
-import { DataIntakeStack } from "../lib/data-intake-stack";
 import { DataCatalogStack } from "../lib/data-catalog-stack";
+import { DataIntakeStack } from "../lib/data-intake-stack";
 import { NetworkStack } from "../lib/network-stack";
 import { loadDeployment } from "./deployment/load-deployment";
 
@@ -18,38 +18,50 @@ const app = new App();
 const deployment = loadDeployment();
 
 // Create the network stack first (required by data intake stack)
-const networkStack = new NetworkStack(app, `${deployment.projectName}-Network`, {
-  account: deployment.account,
-  config: deployment.networkConfig,
-  env: {
-    account: deployment.account.id,
-    region: deployment.account.region
-  },
-  terminationProtection: deployment.account.prodLike
-});
+const networkStack = new NetworkStack(
+  app,
+  `${deployment.projectName}-Network`,
+  {
+    account: deployment.account,
+    config: deployment.networkConfig,
+    env: {
+      account: deployment.account.id,
+      region: deployment.account.region
+    },
+    terminationProtection: deployment.account.prodLike
+  }
+);
 
 // Create the data intake stack
-const dataIntakeStack = new DataIntakeStack(app, `${deployment.projectName}-DataIntake`, {
-  account: deployment.account,
-  vpc: networkStack.vpc,
-  config: deployment.dataplaneConfig,
-  env: {
-    account: deployment.account.id,
-    region: deployment.account.region
-  },
-  terminationProtection: deployment.account.prodLike
-});
+const dataIntakeStack = new DataIntakeStack(
+  app,
+  `${deployment.projectName}-DataIntake`,
+  {
+    account: deployment.account,
+    vpc: networkStack.vpc,
+    config: deployment.dataplaneConfig,
+    env: {
+      account: deployment.account.id,
+      region: deployment.account.region
+    },
+    terminationProtection: deployment.account.prodLike
+  }
+);
 
 // Create the data catalog stack
-const dataCatalogStack = new DataCatalogStack(app, `${deployment.projectName}-DataCatalog`, {
-  account: deployment.account,
-  vpc: networkStack.vpc,
-  env: {
-    account: deployment.account.id,
-    region: deployment.account.region
-  },
-  terminationProtection: deployment.account.prodLike
-});
+const dataCatalogStack = new DataCatalogStack(
+  app,
+  `${deployment.projectName}-DataCatalog`,
+  {
+    account: deployment.account,
+    vpc: networkStack.vpc,
+    env: {
+      account: deployment.account.id,
+      region: deployment.account.region
+    },
+    terminationProtection: deployment.account.prodLike
+  }
+);
 
 // Ensure stacks depend on the network stack
 dataIntakeStack.addDependency(networkStack);

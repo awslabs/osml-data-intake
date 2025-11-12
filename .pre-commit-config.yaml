@@ -33,6 +33,24 @@ repos:
       - id: autopep8
         types: [file, python]
 
+  - repo: local
+    hooks:
+      - id: eslint
+        name: eslint
+        entry: bash -c 'cd cdk && npx eslint . --ext .ts,.tsx,.js,.jsx --fix --ignore-pattern "cdk.out/**"'
+        language: system
+        files: ^cdk/.*\.(ts|tsx|js|jsx)$
+        exclude: ^cdk/cdk\.out
+        types: [file]
+
+      - id: prettier
+        name: prettier
+        entry: bash -c 'cd cdk && npx prettier --write .'
+        language: system
+        files: ^cdk/.*\.(ts|tsx|js|jsx|json|yml|yaml|md)$
+        exclude: ^cdk/cdk\.out
+        types: [file]
+
   - repo: https://github.com/aws-samples/automated-security-helper
     rev: 'v3.0.0' # update with the latest tagged version in the repository
     hooks:
@@ -60,7 +78,8 @@ repos:
             setup.py|
             py.typed|
             bin/bulk/config/bulk_config_template.json|
-            bin/bulk/config/.gitignore
+            bin/bulk/config/.gitignore|
+            cdk/.*
           )$
       - id: copyright-required
         name: require copyright
@@ -78,5 +97,6 @@ repos:
             setup.py|
             py.typed|
             bin/bulk/config/bulk_config_template.json|
-            bin/bulk/config/.gitignore
+            bin/bulk/config/.gitignore|
+            cdk/.*
           )$
