@@ -86,14 +86,11 @@ export class DCOpenSearchDomain extends Construct {
       version: EngineVersion.OPENSEARCH_2_11,
       capacity: {
         dataNodes: dataNodes,
-        dataNodeInstanceType: "r5.large.search"
-      },
-      ebs: {
-        volumeSize: 10
+        multiAzWithStandbyEnabled: false,
       },
       zoneAwareness: {
-        enabled: azCount > 1,
-        availabilityZoneCount: azCount > 1 ? azCount : undefined
+        enabled: true,
+        availabilityZoneCount: azCount
       },
       nodeToNodeEncryption: true,
       encryptionAtRest: {

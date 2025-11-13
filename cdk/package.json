@@ -6,6 +6,7 @@
     "watch": "tsc -w",
     "test": "jest",
     "cdk": "cdk",
+    "deploy": "cdk deploy --all --require-approval never --concurrency 2 || exit 1",
     "lint": "pre-commit run --all-files",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
