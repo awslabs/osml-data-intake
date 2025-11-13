@@ -34,7 +34,7 @@
 import { existsSync, readFileSync } from "fs";
 import { join } from "path";
 
-import { Account } from "../../lib/constructs/shared/osml-account";
+import { OSMLAccount } from "../../lib/constructs/types";
 import { DataCatalogConfig } from "../../lib/data-catalog-stack";
 import { DataIntakeConfig } from "../../lib/data-intake-stack";
 import { NetworkConfig } from "../../lib/network-stack";
@@ -46,7 +46,7 @@ export interface DeploymentConfig {
   /** The project name. */
   projectName: string;
   /** The deployment account. */
-  account: Account;
+  account: OSMLAccount;
   /** Network configuration for the deployment. */
   networkConfig?: NetworkConfig;
   /** Data intake specific configuration. */
@@ -195,7 +195,7 @@ export function loadDeploymentConfig(): DeploymentConfig {
   const isAdc = (accountObj.isAdc as boolean | undefined) ?? false;
 
   // Create Account object
-  const account: Account = {
+  const account: OSMLAccount = {
     id: accountId,
     region: region,
     prodLike: prodLike,
@@ -242,7 +242,7 @@ export function loadDeploymentConfig(): DeploymentConfig {
   const globalObj = global as { __dataIntakeDeploymentConfigLoaded?: boolean };
   if (!globalObj.__dataIntakeDeploymentConfigLoaded) {
     console.log(
-      `🚀 Loading OSML Data Intake deployment configuration: region=${account.region}, prodLike=${account.prodLike}`
+      `Loading OSML Data Intake deployment configuration: region=${account.region}, prodLike=${account.prodLike}`
     );
     globalObj.__dataIntakeDeploymentConfigLoaded = true;
   }

@@ -6,8 +6,8 @@ import { App, Environment, Stack } from "aws-cdk-lib";
 import { Template } from "aws-cdk-lib/assertions";
 import { SynthesisMessage } from "aws-cdk-lib/cx-api";
 
-import { Account } from "../lib/constructs/shared/osml-account";
 import { OSMLVpc } from "../lib/constructs/shared/osml-vpc";
+import { OSMLAccount } from "../lib/constructs/types";
 
 /**
  * Test utility functions for Data Intake CDK tests.
@@ -16,7 +16,9 @@ import { OSMLVpc } from "../lib/constructs/shared/osml-vpc";
 /**
  * Creates a test account configuration.
  */
-export function createTestAccount(overrides: Partial<Account> = {}): Account {
+export function createTestAccount(
+  overrides: Partial<OSMLAccount> = {}
+): OSMLAccount {
   return {
     id: "123456789012",
     region: "us-west-2",

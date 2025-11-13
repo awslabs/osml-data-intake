@@ -11,9 +11,13 @@ import { Construct } from "constructs";
 import { readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 
-import { Account } from "./osml-account";
-import { BaseConfig, ConfigType } from "./utils/base-config";
-import { RegionalConfig, RegionConfig } from "./utils/regional-config";
+import {
+  BaseConfig,
+  ConfigType,
+  OSMLAccount,
+  RegionalConfig,
+  RegionalConfigData
+} from "../types";
 
 /**
  * Configuration class for the ContainerProps Construct.
@@ -73,7 +77,7 @@ export interface ContainerProps {
   /**
    * The account associated with the container.
    */
-  account: Account;
+  account: OSMLAccount;
 
   /**
    * (Optional) Flag to instruct building the Docker image code for the container.
@@ -133,7 +137,7 @@ export class Container extends Construct {
   /**
    * Regional config imputed for this resource.
    */
-  public regionConfig: RegionConfig;
+  public regionConfig: RegionalConfigData;
 
   /**
    * The repository access mode to assign when building model containers for SageMaker.
@@ -156,9 +160,10 @@ export class Container extends Construct {
     super(scope, id);
 
     // Set the removal policy based on the account type
-    this.removalPolicy = props.account.prodLike
-      ? RemovalPolicy.RETAIN
-      : RemovalPolicy.DESTROY;
+    this.removalPolicy =
+      (props.account.prodLike ?? false)
+        ? RemovalPolicy.RETAIN
+        : RemovalPolicy.DESTROY;
 
     // Set whether to build Docker image code for this resource
     this.buildDockerImageCode = props.buildDockerImageCode;
@@ -345,11 +350,10 @@ export class Container extends Construct {
    * @param {string} uri - The container URI.
    */
   private createDockerImageFromRegistry(uri: string): void {
-    const tmpDir = process.cwd();
-    const tmpDockerfile = join(tmpDir, "Dockerfile.tmp");
+    const tmpDockerfile = join(__dirname, "Dockerfile.tmp");
     writeFileSync(tmpDockerfile, `FROM ${uri}`);
 
-    this.dockerImageCode = DockerImageCode.fromImageAsset(tmpDir, {
+    this.dockerImageCode = DockerImageCode.fromImageAsset(__dirname, {
       file: "Dockerfile.tmp",
       followSymlinks: SymlinkFollowMode.ALWAYS
     });

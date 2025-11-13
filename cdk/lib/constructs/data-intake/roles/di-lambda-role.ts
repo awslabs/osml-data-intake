@@ -14,7 +14,7 @@ import {
 } from "aws-cdk-lib/aws-iam";
 import { Construct } from "constructs";
 
-import { Account } from "../../shared/osml-account";
+import { OSMLAccount } from "../../types";
 
 /**
  * Represents the properties required to define a data intake Lambda role.
@@ -25,9 +25,9 @@ export interface DILambdaRoleProps {
   /**
    * The deployment account associated with this role.
    *
-   * @type {Account}
+   * @type {OSMLAccount}
    */
-  account: Account;
+  account: OSMLAccount;
 
   /**
    * The name to give to the role.

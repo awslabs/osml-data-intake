@@ -10,10 +10,9 @@ import { ITopic, Topic } from "aws-cdk-lib/aws-sns";
 import { LambdaSubscription } from "aws-cdk-lib/aws-sns-subscriptions";
 import { Construct } from "constructs";
 
-import { Account } from "../shared/osml-account";
 import { Container } from "../shared/osml-container";
 import { OSMLVpc } from "../shared/osml-vpc";
-import { BaseConfig, ConfigType } from "../shared/utils/base-config";
+import { BaseConfig, ConfigType, OSMLAccount } from "../types";
 import { DCOpenSearchDomain } from "./dc-opensearch-domain";
 import { DCLambdaRole } from "./roles/dc-lambda-role";
 
@@ -131,7 +130,7 @@ export interface DCDataplaneProps {
    * The deployment account.
    * @type {Account}
    */
-  account: Account;
+  account: OSMLAccount;
 
   /**
    * The VPC (Virtual Private Cloud) configuration for the Dataplane.

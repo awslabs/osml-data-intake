@@ -10,14 +10,15 @@ import "source-map-support/register";
 
 import { App, Aspects, Stack } from "aws-cdk-lib";
 import { Annotations, Match, Template } from "aws-cdk-lib/assertions";
+import { Vpc } from "aws-cdk-lib/aws-ec2";
 import { SynthesisMessage } from "aws-cdk-lib/cx-api";
 import { AwsSolutionsChecks } from "cdk-nag";
 
+import { OSMLVpc } from "../lib/constructs/shared/osml-vpc";
 import { DataIntakeConfig, DataIntakeStack } from "../lib/data-intake-stack";
 import {
   createTestAccount,
   createTestApp,
-  createTestVpc,
   generateNagReport
 } from "./test-utils";
 
@@ -31,12 +32,9 @@ describe("DataIntakeStack", () => {
   });
 
   test("creates stack with correct properties", () => {
-    const networkStack = new Stack(app, "NetworkStack");
-    const vpc = createTestVpc(networkStack);
-
     const stack = new DataIntakeStack(app, "TestDataIntakeStack", {
       account: account,
-      vpc: vpc,
+      vpc: null as any, // Will be set after stack creation
       config: new DataIntakeConfig({
         BUILD_FROM_SOURCE: false // Avoid slow container builds in tests
       }),
@@ -45,6 +43,12 @@ describe("DataIntakeStack", () => {
         region: account.region
       }
     });
+
+    // Create VPC in the same stack to avoid cross-stack references
+    const vpc = new OSMLVpc(stack, "TestVpc", {
+      account: account
+    });
+    stack.setVpc(account, vpc);
 
     // Stack should exist and have correct termination protection
     expect(stack.terminationProtection).toBe(false);
@@ -56,12 +60,9 @@ describe("DataIntakeStack", () => {
   test("sets termination protection when prodLike is true", () => {
     const prodAccount = createTestAccount({ prodLike: true });
 
-    const networkStack = new Stack(app, "NetworkStack");
-    const vpc = createTestVpc(networkStack);
-
     const stack = new DataIntakeStack(app, "TestDataIntakeStack", {
       account: prodAccount,
-      vpc: vpc,
+      vpc: null as any, // Will be set after stack creation
       config: new DataIntakeConfig({
         BUILD_FROM_SOURCE: false // Avoid slow container builds in tests
       }),
@@ -72,16 +73,19 @@ describe("DataIntakeStack", () => {
       terminationProtection: prodAccount.prodLike
     });
 
+    // Create VPC in the same stack to avoid cross-stack references
+    const vpc = new OSMLVpc(stack, "TestVpc", {
+      account: prodAccount
+    });
+    stack.setVpc(prodAccount, vpc);
+
     expect(stack.terminationProtection).toBe(true);
   });
 
   test("creates dataplane construct with resources", () => {
-    const networkStack = new Stack(app, "NetworkStack");
-    const vpc = createTestVpc(networkStack);
-
     const stack = new DataIntakeStack(app, "TestDataIntakeStack", {
       account: account,
-      vpc: vpc,
+      vpc: null as any, // Will be set after stack creation
       config: new DataIntakeConfig({
         BUILD_FROM_SOURCE: false // Avoid slow container builds in tests
       }),
@@ -91,16 +95,28 @@ describe("DataIntakeStack", () => {
       }
     });
 
+    // Create VPC in the same stack to avoid cross-stack references
+    const vpc = new OSMLVpc(stack, "TestVpc", {
+      account: account
+    });
+    stack.setVpc(account, vpc);
+
     // Dataplane should be created
     expect(stack.dataIntakeDataplane).toBeDefined();
 
     const template = Template.fromStack(stack);
 
     // Check for key resources
-    template.resourceCountIs("AWS::Lambda::Function", 1);
+    // Note: 2 Lambda functions are created:
+    // 1. DataIntakeFunction - The main Lambda function for processing data intake requests
+    // 2. CustomS3AutoDeleteObjectsCustomResourceProviderHandler - CDK-generated custom resource for S3 bucket auto-deletion
+    template.resourceCountIs("AWS::Lambda::Function", 2);
     template.resourceCountIs("AWS::SNS::Topic", 2);
     template.resourceCountIs("AWS::S3::Bucket", 1);
-    template.resourceCountIs("AWS::IAM::Role", 1);
+    // Note: 2 IAM roles are created:
+    // 1. DILambdaRole - The main IAM role for the DataIntakeFunction
+    // 2. CustomS3AutoDeleteObjectsCustomResourceProviderRole - IAM role for the S3 auto-deletion custom resource
+    template.resourceCountIs("AWS::IAM::Role", 2);
   });
 });
 

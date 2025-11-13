@@ -14,7 +14,7 @@ import {
 } from "aws-cdk-lib/aws-iam";
 import { Construct } from "constructs";
 
-import { Account } from "../../shared/osml-account";
+import { OSMLAccount } from "../../types";
 
 /**
  * Represents the properties required to define a data catalog Lambda role.
@@ -23,7 +23,7 @@ export interface DCLambdaRoleProps {
   /**
    * The deployment account associated with this role.
    */
-  account: Account;
+  account: OSMLAccount;
 
   /**
    * The name to give to the role.

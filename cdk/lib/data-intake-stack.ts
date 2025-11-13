@@ -6,9 +6,8 @@ import { Stack, StackProps } from "aws-cdk-lib";
 import { Construct } from "constructs";
 
 import { DIDataplane } from "./constructs/data-intake/di-dataplane";
-import { Account } from "./constructs/shared/osml-account";
 import { OSMLVpc } from "./constructs/shared/osml-vpc";
-import { BaseConfig } from "./constructs/shared/utils/base-config";
+import { BaseConfig, OSMLAccount } from "./constructs/types";
 
 /**
  * Configuration class for DataIntakeStack.
@@ -31,15 +30,15 @@ export class DataIntakeConfig extends BaseConfig {
 export interface DataIntakeStackProps extends StackProps {
   /**
    * The deployment account.
-   * @type {Account}
+   * @type {OSMLAccount}
    */
-  account: Account;
+  account: OSMLAccount;
 
   /**
    * The VPC (Virtual Private Cloud) configuration for the stack.
    * @type {OSMLVpc}
    */
-  vpc: OSMLVpc;
+  vpc: OSMLVpc | null;
 
   /**
    * Custom configuration for the DataIntakeStack.
@@ -64,7 +63,7 @@ export class DataIntakeStack extends Stack {
   /**
    * The data intake dataplane construct containing all processing resources.
    */
-  public dataIntakeDataplane: DIDataplane;
+  public dataIntakeDataplane?: DIDataplane;
 
   /**
    * Creates an instance of DataIntakeStack.
@@ -78,10 +77,32 @@ export class DataIntakeStack extends Stack {
     // Check if a custom configuration was provided or create a default one
     this.config = props.config ?? new DataIntakeConfig();
 
-    // Create the data intake dataplane with all required resources
+    // Create the data intake dataplane with all required resources if VPC is provided
+    if (props.vpc) {
+      this.createDataplane(props.account, props.vpc);
+    }
+  }
+
+  /**
+   * Creates the data intake dataplane with the provided VPC.
+   * @param account - The deployment account
+   * @param vpc - The VPC configuration
+   */
+  public createDataplane(account: OSMLAccount, vpc: OSMLVpc): void {
     this.dataIntakeDataplane = new DIDataplane(this, "DIDataplane", {
-      account: props.account,
-      vpc: props.vpc
+      account: account,
+      vpc: vpc
     });
+  }
+
+  /**
+   * Sets the VPC for this stack and creates the dataplane if not already created.
+   * @param account - The deployment account
+   * @param vpc - The VPC configuration
+   */
+  public setVpc(account: OSMLAccount, vpc: OSMLVpc): void {
+    if (!this.dataIntakeDataplane) {
+      this.createDataplane(account, vpc);
+    }
   }
 }

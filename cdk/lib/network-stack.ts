@@ -5,9 +5,8 @@
 import { Stack, StackProps } from "aws-cdk-lib";
 import { Construct } from "constructs";
 
-import { Account } from "./constructs/shared/osml-account";
 import { OSMLVpc } from "./constructs/shared/osml-vpc";
-import { BaseConfig } from "./constructs/shared/utils/base-config";
+import { BaseConfig, OSMLAccount } from "./constructs/types";
 
 /**
  * Configuration class for NetworkStack.
@@ -37,9 +36,9 @@ export class NetworkConfig extends BaseConfig {
 export interface NetworkStackProps extends StackProps {
   /**
    * The deployment account.
-   * @type {Account}
+   * @type {OSMLAccount}
    */
-  account: Account;
+  account: OSMLAccount;
 
   /**
    * Custom configuration for the NetworkStack.

@@ -1,1 +1,1 @@
-FROM awsosml/osml-data-intake-ingest:latest
+FROM awsosml/osml-data-intake-intake:latest

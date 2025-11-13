@@ -20,9 +20,7 @@ import { IRole, Role } from "aws-cdk-lib/aws-iam";
 import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
 import { Construct } from "constructs";
 
-import { Account } from "./osml-account";
-import { BaseConfig, ConfigType } from "./utils/base-config";
-import { RegionalConfig } from "./utils/regional-config";
+import { BaseConfig, ConfigType, OSMLAccount, RegionalConfig } from "../types";
 
 export class VpcConfig extends BaseConfig {
   /**
@@ -80,9 +78,9 @@ export interface VpcProps {
   /**
    * The account details which will determine some VPC settings based on region and environment.
    *
-   * @type {Account}
+   * @type {OSMLAccount}
    */
-  account: Account;
+  account: OSMLAccount;
 
   /**
    * The custom configuration to be used when deploying this VPC.
@@ -151,9 +149,10 @@ export class OSMLVpc extends Construct {
 
     const regionConfig = RegionalConfig.getConfig(props.account.region);
 
-    this.removalPolicy = props.account.prodLike
-      ? RemovalPolicy.RETAIN
-      : RemovalPolicy.DESTROY;
+    this.removalPolicy =
+      (props.account.prodLike ?? false)
+        ? RemovalPolicy.RETAIN
+        : RemovalPolicy.DESTROY;
 
     if (this.config.VPC_ID) {
       this.vpc = EC2Vpc.fromLookup(this, "ImportVPC", {
@@ -187,7 +186,7 @@ export class OSMLVpc extends Construct {
 
     this.selectSubnets();
 
-    if (props.account.prodLike) {
+    if (props.account.prodLike ?? false) {
       this.setupFlowLogs();
     }
   }

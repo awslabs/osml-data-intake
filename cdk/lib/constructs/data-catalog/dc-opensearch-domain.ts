@@ -16,8 +16,8 @@ import {
 } from "aws-cdk-lib/aws-opensearchservice";
 import { Construct } from "constructs";
 
-import { Account } from "../shared/osml-account";
 import { OSMLVpc } from "../shared/osml-vpc";
+import { OSMLAccount } from "../types";
 
 /**
  * Properties for configuring the DCOpenSearchDomain Construct.
@@ -26,7 +26,7 @@ export interface DCOpenSearchDomainProps {
   /**
    * The deployment account.
    */
-  account: Account;
+  account: OSMLAccount;
 
   /**
    * The VPC configuration for the OpenSearch domain.

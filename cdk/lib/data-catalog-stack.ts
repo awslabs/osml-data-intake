@@ -6,9 +6,8 @@ import { Stack, StackProps } from "aws-cdk-lib";
 import { Construct } from "constructs";
 
 import { DCDataplane } from "./constructs/data-catalog/dc-dataplane";
-import { Account } from "./constructs/shared/osml-account";
 import { OSMLVpc } from "./constructs/shared/osml-vpc";
-import { BaseConfig } from "./constructs/shared/utils/base-config";
+import { BaseConfig, OSMLAccount } from "./constructs/types";
 
 /**
  * Configuration class for DataCatalogStack.
@@ -33,7 +32,7 @@ export interface DataCatalogStackProps extends StackProps {
    * The deployment account.
    * @type {Account}
    */
-  account: Account;
+  account: OSMLAccount;
 
   /**
    * The VPC (Virtual Private Cloud) configuration for the stack.

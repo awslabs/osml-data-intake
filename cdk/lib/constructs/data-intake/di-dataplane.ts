@@ -11,11 +11,10 @@ import { ITopic, Topic } from "aws-cdk-lib/aws-sns";
 import { LambdaSubscription } from "aws-cdk-lib/aws-sns-subscriptions";
 import { Construct } from "constructs";
 
-import { Account } from "../shared/osml-account";
 import { OSMLBucket } from "../shared/osml-bucket";
 import { Container } from "../shared/osml-container";
 import { OSMLVpc } from "../shared/osml-vpc";
-import { BaseConfig, ConfigType } from "../shared/utils/base-config";
+import { BaseConfig, ConfigType, OSMLAccount } from "../types";
 import { DILambdaRole } from "./roles/di-lambda-role";
 
 /**
@@ -135,9 +134,9 @@ export class DIDataplaneConfig extends BaseConfig {
 export interface DIDataplaneProps {
   /**
    * The deployment account.
-   * @type {Account}
+   * @type {OSMLAccount}
    */
-  account: Account;
+  account: OSMLAccount;
 
   /**
    * The VPC (Virtual Private Cloud) configuration for the Dataplane.
@@ -236,7 +235,7 @@ export class DIDataplane extends Construct {
     // Create a test output bucket
     this.outputBucket = new OSMLBucket(this, `DIInputBucket`, {
       bucketName: `${this.config.S3_OUTPUT_BUCKET_NAME}-${props.account.id}`,
-      prodLike: props.account.prodLike,
+      prodLike: props.account.prodLike ?? false,
       removalPolicy: this.removalPolicy
     }).bucket;
 
@@ -297,9 +296,10 @@ export class DIDataplane extends Construct {
     }
 
     // Setup a removal policy
-    this.removalPolicy = props.account.prodLike
-      ? RemovalPolicy.RETAIN
-      : RemovalPolicy.DESTROY;
+    this.removalPolicy =
+      (props.account.prodLike ?? false)
+        ? RemovalPolicy.RETAIN
+        : RemovalPolicy.DESTROY;
 
     // Create an SNS topic for Data Intake requests if needed
     if (props.inputTopic) {
