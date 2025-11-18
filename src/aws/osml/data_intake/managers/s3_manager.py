@@ -1,4 +1,4 @@
-#  Copyright 2023-2024 Amazon.com, Inc. or its affiliates.
+#  Copyright 2023-2025 Amazon.com, Inc. or its affiliates.
 
 import os
 import shutil
@@ -91,7 +91,13 @@ class S3Manager:
 
         :param output_bucket: The name of the S3 bucket used for uploads.
         """
-        self.output_bucket = "s3://" + output_bucket if not output_bucket.startswith("s3://") else output_bucket
+        # Normalize output_bucket: ensure it has exactly one s3:// prefix
+        # This prevents double prefixes (e.g., s3://s3://bucket-name)
+        prefix = "s3://"
+        bucket_name = output_bucket
+        while bucket_name.startswith(prefix):
+            bucket_name = bucket_name[len(prefix) :]
+        self.output_bucket = f"{prefix}{bucket_name}"
         self.s3_client = aws_s3 if aws_s3 else boto3.resource("s3")
         self.tmp_dir = input_dir
         self.s3_url: Optional[S3Url] = None

@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from math import ceil, degrees, log
 from typing import Any, Dict, List, Optional
 
+import boto3
 from osgeo import gdal
 from stac_fastapi.types.stac import Item
 
@@ -16,6 +17,7 @@ from aws.osml.photogrammetry.sensor_model import SensorModel
 
 from .managers import S3Manager, S3Url, SNSManager, SNSRequest
 from .processor_base import ProcessorBase
+from .stac_validator import StacValidationError, validate_stac_item
 from .utils import AsyncContextFilter, logger
 
 os.environ["PROJ_LIB"] = "/opt/conda/envs/osml_data_intake/share/proj"
@@ -79,7 +81,8 @@ class ImageData:
         coordinates = []
         for corner in self.image_corners:
             world_coordinate = self.sensor_model.image_to_world(ImageCoordinate(corner))
-            coordinates.append((degrees(world_coordinate.longitude), degrees(world_coordinate.latitude)))
+            # Convert to list (not tuple) for STAC/GeoJSON compliance
+            coordinates.append([degrees(world_coordinate.longitude), degrees(world_coordinate.latitude)])
         coordinates.append(coordinates[0])
         self.geo_polygon = [coordinates]
 
@@ -184,6 +187,54 @@ class ImageData:
 
         return info_file
 
+    @staticmethod
+    def _get_aws_region() -> str:
+        """
+        Get AWS region from environment or default.
+
+        :returns: AWS region string.
+        """
+        return os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION") or "us-west-2"
+
+    @staticmethod
+    def _discover_stac_api_url(region: str = None, export_name: str = "DC-StacApiUrl") -> Optional[str]:
+        """
+        Discover the STAC API URL from CloudFormation exports.
+
+        :param region: The AWS region to search in. If None, uses the region from environment or default.
+        :param export_name: The CloudFormation export name to look for (default: "DC-StacApiUrl").
+        :returns: The STAC API URL, or None if not found.
+        """
+        try:
+            if region is None:
+                region = ImageData._get_aws_region()
+
+            cf_client = boto3.client("cloudformation", region_name=region)
+
+            # List all exports
+            response = cf_client.list_exports()
+
+            for export in response.get("Exports", []):
+                if export["Name"] == export_name:
+                    logger.info(f"Found STAC API URL from CloudFormation export: {export['Value']}")
+                    return export["Value"]
+
+            # If not found in first page, paginate through all exports
+            next_token = response.get("NextToken")
+            while next_token:
+                response = cf_client.list_exports(NextToken=next_token)
+                for export in response.get("Exports", []):
+                    if export["Name"] == export_name:
+                        logger.info(f"Found STAC API URL from CloudFormation export: {export['Value']}")
+                        return export["Value"]
+                next_token = response.get("NextToken")
+
+            logger.warning(f"STAC API URL not found in CloudFormation exports (looking for '{export_name}')")
+            return None
+        except Exception as e:
+            logger.warning(f"Error discovering STAC API URL from CloudFormation: {e}")
+            return None
+
     def generate_stac_item(self, s3_manager: S3Manager, request: SNSRequest, ovr_file, stac_catalog: str = ".") -> Item:
         """
         Create and publish a STAC item using the configured SNS manager.
@@ -191,7 +242,7 @@ class ImageData:
         :param: s3_manager: The s3 manager handling the source file.
         :param: request: The SNSRequest used to derive a STAC Item
         :param: ovr_file: The overview file created by GDAL, but may not always be present for small images.
-        :param: stac_catalog: The catalog the item is intended for.
+        :param: stac_catalog: The catalog the item is intended for. If ".", will attempt to discover from CloudFormation.
         :returns: The generated STAC item.
         :raises ClientError: If publishing to SNS fails.
         """
@@ -236,29 +287,61 @@ class ImageData:
                 "type": "application/octet-stream",
                 "roles": ["data"],
             }
-        return Item(
-            **{
-                "id": request.item_id,
-                "collection": request.collection_id,
-                "type": "Feature",
-                "geometry": {"type": "Polygon", "coordinates": self.geo_polygon},
-                "bbox": self.geo_bbox,
-                "properties": {
-                    "datetime": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-                    "description": f"STAC Item for image {s3_manager.s3_url.url}",
-                },
-                "assets": assets,
-                "links": [
-                    {"href": f"{stac_catalog}/collections/{request.collection_id}/items/{request.item_id}", "rel": "self"},
-                    {
-                        "href": f"{stac_catalog}/collections/{request.collection_id}",
-                        "rel": "collection",
-                        "type": "application/json",
-                    },
-                ],
-                "stac_version": "1.0.0",
-            }
-        )
+
+        # Discover STAC API URL if not provided
+        if stac_catalog == ".":
+            region = self._get_aws_region()
+            stac_api_url = self._discover_stac_api_url(region=region)
+            if stac_api_url:
+                stac_catalog = stac_api_url.rstrip("/")
+                logger.info(f"Using discovered STAC API URL: {stac_catalog}")
+            else:
+                # Try environment variable as fallback
+                stac_catalog = os.getenv("STAC_API_URL") or os.getenv("STAC_ENDPOINT")
+                if stac_catalog:
+                    stac_catalog = stac_catalog.rstrip("/")
+                    logger.info(f"Using STAC API URL from environment variable: {stac_catalog}")
+                else:
+                    logger.warning("Could not determine STAC API URL - using relative paths (may cause validation issues)")
+                    stac_catalog = None
+
+        # Build hrefs - use absolute URLs when catalog is available, otherwise relative paths
+        if stac_catalog and stac_catalog != ".":
+            catalog_base = stac_catalog.rstrip("/")
+            self_href = f"{catalog_base}/collections/{request.collection_id}/items/{request.item_id}"
+            collection_href = f"{catalog_base}/collections/{request.collection_id}"
+        else:
+            self_href = f"/collections/{request.collection_id}/items/{request.item_id}"
+            collection_href = f"/collections/{request.collection_id}"
+
+        logger.info(f"Generated STAC item links - self: {self_href}, collection: {collection_href}")
+
+        # Ensure links are properly formatted
+        links = [
+            {"href": self_href, "rel": "self"},
+            {
+                "href": collection_href,
+                "rel": "collection",
+                "type": "application/json",
+            },
+        ]
+
+        item_data = {
+            "id": request.item_id,
+            "collection": request.collection_id,
+            "type": "Feature",
+            "geometry": {"type": "Polygon", "coordinates": self.geo_polygon},
+            "bbox": self.geo_bbox,
+            "properties": {
+                "datetime": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+                "description": f"STAC Item for image {s3_manager.s3_url.url}",
+            },
+            "assets": assets,
+            "links": links,
+            "stac_version": "1.0.0",
+        }
+
+        return Item(**item_data)
 
     def clean_dataset(self) -> None:
         """
@@ -331,9 +414,23 @@ class ImageProcessor(ProcessorBase):
             if ovr_file:
                 self.s3_manager.upload_file(ovr_file, "OVR", {"ContentType": "image/tiff"})
 
-            # Generate and publish the STAC item to the SNS topic
+            # Generate and validate the STAC item
             stac_item = image_data.generate_stac_item(self.s3_manager, self.sns_request, ovr_file)
-            self.sns_manager.publish_message(json.dumps(stac_item))
+
+            # Validate the STAC item before publishing
+            try:
+                validate_stac_item(stac_item)
+                logger.info("STAC item validation passed")
+            except StacValidationError as validation_err:
+                logger.error(f"STAC item validation failed: {validation_err}")
+                return self.failure_message(f"Invalid STAC item: {validation_err}")
+
+            # Convert Item TypedDict to dict for JSON serialization
+            # validate_stac_item already handles this conversion, so we can safely convert here
+            stac_item_dict = dict(stac_item) if hasattr(stac_item, "keys") and not isinstance(stac_item, dict) else stac_item
+
+            logger.info(f"Publishing STAC item with {len(stac_item_dict.get('links', []))} links")
+            self.sns_manager.publish_message(json.dumps(stac_item_dict))
 
             # Clean up the GDAL dataset
             image_data.clean_dataset()
