@@ -24,9 +24,9 @@ the processed geospatial assets.
     * [Prerequisites](#prerequisites)
     * [Installation Guide](#installation-guide)
     * [Documentation](#documentation)
-* [Testing Locally](#testing-locally)
-    * [Testing Data Intake](#testing-data-intake)
-    * [Testing Data Catalog](#testing-data-catalog)
+* [Test Locally](#testing-locally)
+    * [Test Data Intake](#testing-data-intake)
+    * [Test Data Catalog](#testing-data-catalog)
 * [Submitting a Bulk Ingest Job](#submitting-a-bulk-ingest-job)
 * [Support & Feedback](#support--feedback)
 * [Security](#security)
@@ -66,7 +66,7 @@ version of the API documents.
 tox -e docs
 ```
 
-## Testing Locally
+## Test Locally
 
 After setting up your environment, you can verify your setup by sending a test message to the SNS topic that will trigger your application workflow. This is useful for ensuring that your processing pipeline works correctly with a given image.
 
@@ -75,7 +75,7 @@ After setting up your environment, you can verify your setup by sending a test m
 - Make sure that you have the AWS CLI installed and configured.
 - Deploy the osml-data-intake infrastructure using the [guidance package](https://github.com/aws-solutions-library-samples/guidance-for-processing-overhead-imagery-on-aws)
 
-### Testing Data Intake
+### Test Data Intake
 
 **Run the Test Command:**
 
@@ -96,7 +96,7 @@ After setting up your environment, you can verify your setup by sending a test m
   Verify that the auxiliary files are generated and uploaded to your configured S3 bucket,
   and ensure that the logs indicate a successful run.
 
-### Testing Data Catalog
+### Test Data Catalog
 
 1. To put a test item directly in your STAC catalog, update the following command and run it with your endpoint:
     ```bash
