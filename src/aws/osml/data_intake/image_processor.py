@@ -184,7 +184,7 @@ class ImageData:
 
         return info_file
 
-    def generate_stac_item(self, s3_manager: S3Manager, request: SNSRequest, ovr_file, stac_catalog: str = "") -> Item:
+    def generate_stac_item(self, s3_manager: S3Manager, request: SNSRequest, ovr_file, stac_catalog: str = ".") -> Item:
         """
         Create and publish a STAC item using the configured SNS manager.
 
@@ -205,13 +205,13 @@ class ImageData:
                 "roles": ["data"],
             },
             "aux": {
-                "href": f"s3://{s3_manager.output_bucket}/{request.item_id}/{key}{self.aux_ext}",
+                "href": f"{s3_manager.output_bucket}/{request.item_id}/{key}{self.aux_ext}",
                 "title": "Processed Auxiliary",
                 "type": "application/xml",
                 "roles": ["data"],
             },
             "info": {
-                "href": f"s3://{s3_manager.output_bucket}/{request.item_id}/{key}{self.gdalinfo_ext}",
+                "href": f"{s3_manager.output_bucket}/{request.item_id}/{key}{self.gdalinfo_ext}",
                 "title": "GDAL Info",
                 "type": "application/json",
                 "roles": ["data"],
@@ -225,13 +225,13 @@ class ImageData:
                 "roles": ["overview"],
                 "item_id": request.item_id,
                 "collection_id": request.collection_id,
-                "s3_uri": f"s3://{s3_manager.s3_url.bucket}/{key}",
+                "s3_uri": f"{s3_manager.s3_url.bucket}/{key}",
                 "tile_size": self.viewpoint_tile_size,
                 "range_adjustment": self.viewpoint_range_adjustment,
             }
         if ovr_file:
             assets["ovr"] = {
-                "href": f"s3://{s3_manager.output_bucket}/{request.item_id}/{key}{self.overview_ext}",
+                "href": f"{s3_manager.output_bucket}/{request.item_id}/{key}{self.overview_ext}",
                 "title": "Processed Overview",
                 "type": "application/octet-stream",
                 "roles": ["data"],
@@ -248,7 +248,14 @@ class ImageData:
                     "description": f"STAC Item for image {s3_manager.s3_url.url}",
                 },
                 "assets": assets,
-                "links": [{"href": stac_catalog, "rel": "self"}],
+                "links": [
+                    {"href": f"{stac_catalog}/collections/{request.collection_id}/items/{request.item_id}", "rel": "self"},
+                    {
+                        "href": f"{stac_catalog}/collections/{request.collection_id}",
+                        "rel": "collection",
+                        "type": "application/json",
+                    },
+                ],
                 "stac_version": "1.0.0",
             }
         )
