@@ -34,12 +34,12 @@ repos:
         types: [file, python]
 
   - repo: https://github.com/aws-samples/automated-security-helper
-    rev: 'v3.0.0' # update with the latest tagged version in the repository
+    rev: 'v3.0.0'
     hooks:
-      - id: ash
-        stages: [ manual ]
-        # uncomment the line below if using "finch" on MacOS
-        # args: [ "-f" ]
+        - id: ash
+          stages: [ manual ]
+          # uncomment the line below if using "finch" on MacOS
+          # args: [ "-f" ]
 
   - repo: https://github.com/sbrunner/pre-commit-copyright
     rev: 1.6.1
@@ -52,15 +52,27 @@ repos:
             ^\..+|
             .+\.md|
             test/data/.*|
-            src/aws/osml/data_intake/schemas/.*|
             LICENSE|
             tox.ini|
             pyproject.toml|
             setup.cfg|
             setup.py|
             py.typed|
-            bin/bulk/config/bulk_config_template.json|
-            bin/bulk/config/.gitignore
+            .*\.json|
+            .*\.geojson|
+            .*\.yml|
+            .*\.yaml|
+            .*\.example|
+            .*\.gitignore|
+            .*\.js|
+            .*\.mjs|
+            .*\.d\.ts|
+            .*\.sh|
+            .*\.txt|
+            .*\.lock|
+            .*\.prettierignore|
+            .*\.npmignore|
+            .*\.prettierrc
           )$
       - id: copyright-required
         name: require copyright
@@ -70,13 +82,60 @@ repos:
             ^\..+|
             .+\.md|
             test/data/.*|
-            src/aws/osml/data_intake/schemas/.*|
             LICENSE|
             tox.ini|
             pyproject.toml|
             setup.cfg|
             setup.py|
             py.typed|
-            bin/bulk/config/bulk_config_template.json|
-            bin/bulk/config/.gitignore
+            .*\.json|
+            .*\.geojson|
+            .*\.yml|
+            .*\.yaml|
+            .*\.example|
+            .*\.gitignore|
+            .*\.js|
+            .*\.mjs|
+            .*\.d\.ts|
+            .*\.sh|
+            .*\.txt|
+            .*\.lock|
+            .*\.prettierignore|
+            .*\.npmignore|
+            .*\.prettierrc
           )$
+
+  - repo: local
+    hooks:
+      - id: npm-install
+        name: install npm dependencies
+        entry: bash -c 'cd cdk && npm ci'
+        language: system
+        files: ^cdk/.*\.(ts|tsx|js|jsx|json)$
+        exclude: ^cdk/cdk\.out
+        pass_filenames: false
+
+      - id: jest
+        name: jest tests
+        entry: bash -c 'cd cdk && npm run test'
+        language: system
+        files: ^cdk/.*\.(ts|tsx)$
+        exclude: ^cdk/cdk\.out
+        types: [ file ]
+        pass_filenames: false
+
+      - id: eslint
+        name: eslint
+        entry: bash -c 'cd cdk && npx eslint . --ext .ts,.tsx --fix --ignore-pattern "cdk.out/**"'
+        language: system
+        files: ^cdk/.*\.(ts|tsx)$
+        exclude: ^cdk/cdk\.out
+        types: [file]
+
+      - id: prettier
+        name: prettier
+        entry: bash -c 'cd cdk && npx prettier --write .'
+        language: system
+        files: ^cdk/.*\.(ts|tsx|js|jsx|json|yml|yaml|md)$
+        exclude: ^cdk/cdk\.out
+        types: [file]
