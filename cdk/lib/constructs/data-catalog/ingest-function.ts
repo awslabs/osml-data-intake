@@ -17,7 +17,7 @@ import { Construct } from "constructs";
 
 import { OSMLAccount } from "../types";
 import { Container } from "./container";
-import { DCDataplaneConfig } from "./dataplane";
+import { DataplaneConfig } from "./dataplane";
 
 /**
  * Properties for creating the ingest Lambda function.
@@ -38,7 +38,7 @@ export interface IngestFunctionProps {
   /** The ingest SNS topic. */
   readonly ingestTopic: ITopic;
   /** The DC dataplane configuration. */
-  readonly config: DCDataplaneConfig;
+  readonly config: DataplaneConfig;
 }
 
 /**
@@ -77,8 +77,8 @@ export class IngestFunction extends Construct {
     };
 
     // Create the ingest Lambda function
-    this.function = new DockerImageFunction(this, "DCIngestFunction", {
-      functionName: "DCIngestLambda",
+    this.function = new DockerImageFunction(this, "DataCatalogIngestFunction", {
+      functionName: "data-catalog-ingest",
       code: props.ingestContainer.dockerImageCode,
       role: props.lambdaRole,
       vpc: props.vpc,

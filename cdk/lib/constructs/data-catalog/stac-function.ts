@@ -16,7 +16,7 @@ import { Construct } from "constructs";
 
 import { OSMLAccount } from "../types";
 import { Container } from "./container";
-import { DCDataplaneConfig } from "./dataplane";
+import { DataplaneConfig } from "./dataplane";
 
 /**
  * Properties for creating the STAC Lambda function.
@@ -35,7 +35,7 @@ export interface StacFunctionProps {
   /** The OpenSearch domain. */
   readonly osDomain: Domain;
   /** The DC dataplane configuration. */
-  readonly config: DCDataplaneConfig;
+  readonly config: DataplaneConfig;
 }
 
 /**
@@ -74,8 +74,8 @@ export class StacFunction extends Construct {
     };
 
     // Create the STAC API Lambda function
-    this.function = new DockerImageFunction(this, "DCStacFunction", {
-      functionName: "DCStacLambda",
+    this.function = new DockerImageFunction(this, "DataCatalogStacFunction", {
+      functionName: "data-catalog-stac",
       code: props.stacContainer.dockerImageCode,
       role: props.lambdaRole,
       vpc: props.vpc,

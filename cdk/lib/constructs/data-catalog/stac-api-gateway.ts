@@ -14,7 +14,7 @@ import { NagSuppressions } from "cdk-nag";
 import { Construct } from "constructs";
 
 import { OSMLAccount } from "../types";
-import { DCDataplaneConfig } from "./dataplane";
+import { DataplaneConfig } from "./dataplane";
 
 /**
  * Properties for creating the STAC API Gateway.
@@ -25,7 +25,7 @@ export interface StacApiGatewayProps {
   /** The STAC Lambda function to integrate with. */
   readonly stacFunction: Function;
   /** The DC dataplane configuration. */
-  readonly config: DCDataplaneConfig;
+  readonly config: DataplaneConfig;
   /** The service name abbreviation. */
   readonly serviceNameAbbreviation: string;
 }

@@ -10,10 +10,11 @@ import {
   BucketEncryption,
   ObjectOwnership
 } from "aws-cdk-lib/aws-s3";
+import { NagSuppressions } from "cdk-nag";
 import { Construct } from "constructs";
 
 import { OSMLAccount } from "../types";
-import { DIDataplaneConfig } from "./dataplane";
+import { DataplaneConfig } from "./dataplane";
 
 /**
  * Properties for creating metadata storage resources.
@@ -21,8 +22,8 @@ import { DIDataplaneConfig } from "./dataplane";
 export interface MetadataStorageProps {
   /** The OSML account configuration. */
   readonly account: OSMLAccount;
-  /** The DI dataplane configuration. */
-  readonly config: DIDataplaneConfig;
+  /** The dataplane configuration. */
+  readonly config: DataplaneConfig;
   /** The removal policy for resources. */
   readonly removalPolicy: RemovalPolicy;
 }
@@ -63,5 +64,23 @@ export class MetadataStorage extends Construct {
       versioned: prodLike,
       accessControl: BucketAccessControl.BUCKET_OWNER_FULL_CONTROL
     });
+
+    // Add cdk-nag suppressions
+    NagSuppressions.addResourceSuppressions(
+      this.outputBucket,
+      [
+        {
+          id: "AwsSolutions-S1",
+          reason:
+            "Server access logging is not required for the metadata storage bucket. The bucket is used for internal data processing and access is controlled via IAM policies. CloudTrail provides audit logging for S3 API calls."
+        },
+        {
+          id: "AwsSolutions-S2",
+          reason:
+            "Versioning is enabled for production-like accounts. For non-production accounts, versioning is disabled to reduce storage costs. The bucket uses lifecycle policies and removal policies appropriate for the environment."
+        }
+      ],
+      true
+    );
   }
 }

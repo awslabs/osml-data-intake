@@ -16,7 +16,6 @@ import { App } from "aws-cdk-lib";
 import { IVpc, Vpc } from "aws-cdk-lib/aws-ec2";
 
 import { DataCatalogStack } from "../lib/data-catalog-stack";
-import { DataIntakeStack } from "../lib/data-intake-stack";
 import { NetworkStack } from "../lib/network-stack";
 import { loadDeploymentConfig } from "./deployment/load-deployment";
 
@@ -62,30 +61,7 @@ const networkStack = new NetworkStack(
 );
 
 // -----------------------------------------------------------------------------
-// Deploy the DataCatalogStack
-// -----------------------------------------------------------------------------
-
-// -----------------------------------------------------------------------------
-// Deploy the DataIntakeStack (must be deployed before DataCatalogStack)
-// -----------------------------------------------------------------------------
-
-const dataIntakeStack = new DataIntakeStack(
-  app,
-  `${deployment.projectName}-DataIntake`,
-  {
-    env: {
-      account: deployment.account.id,
-      region: deployment.account.region
-    },
-    deployment: deployment,
-    vpc: networkStack.network.vpc,
-    selectedSubnets: networkStack.network.selectedSubnets
-  }
-);
-dataIntakeStack.node.addDependency(networkStack);
-
-// -----------------------------------------------------------------------------
-// Deploy the DataCatalogStack (subscribes to DataIntake output topic)
+// Deploy the DataCatalogStack (includes data-intake components)
 // -----------------------------------------------------------------------------
 
 const dataCatalogStack = new DataCatalogStack(
@@ -98,9 +74,7 @@ const dataCatalogStack = new DataCatalogStack(
     },
     deployment: deployment,
     vpc: networkStack.network.vpc,
-    selectedSubnets: networkStack.network.selectedSubnets,
-    ingestTopic: dataIntakeStack.resources.stacTopic // Subscribe to data intake output topic
+    selectedSubnets: networkStack.network.selectedSubnets
   }
 );
 dataCatalogStack.node.addDependency(networkStack);
-dataCatalogStack.node.addDependency(dataIntakeStack);

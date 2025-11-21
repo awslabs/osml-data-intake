@@ -67,8 +67,6 @@ export interface DeploymentConfig {
 
   /** Optional Dataplane configuration. Can be a partial config object passed to DataplaneConfig constructor. */
   dataplaneConfig?: Partial<Record<string, unknown>>;
-  /** Optional Data Intake configuration. Can be a partial config object passed to DIDataplaneConfig constructor. */
-  dataIntakeConfig?: Partial<Record<string, unknown>>;
 }
 
 /**
@@ -356,16 +354,6 @@ export function loadDeploymentConfig(): DeploymentConfig {
     dataplaneConfig = parsedObj.dataplaneConfig as Record<string, unknown>;
   }
 
-  // Parse optional Data Intake configuration
-  let dataIntakeConfig: DeploymentConfig["dataIntakeConfig"] = undefined;
-  if (
-    parsedObj.dataIntakeConfig &&
-    typeof parsedObj.dataIntakeConfig === "object" &&
-    parsedObj.dataIntakeConfig !== null
-  ) {
-    dataIntakeConfig = parsedObj.dataIntakeConfig as Record<string, unknown>;
-  }
-
   const validatedConfig: DeploymentConfig = {
     projectName,
     account: {
@@ -375,8 +363,7 @@ export function loadDeploymentConfig(): DeploymentConfig {
       isAdc: (accountObj.isAdc as boolean | undefined) ?? false
     },
     networkConfig,
-    dataplaneConfig: dataplaneConfig,
-    dataIntakeConfig: dataIntakeConfig
+    dataplaneConfig: dataplaneConfig
   };
 
   // Only log non-sensitive configuration details (prevent duplicate logging)

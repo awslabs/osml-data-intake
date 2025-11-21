@@ -19,7 +19,7 @@ import { NagSuppressions } from "cdk-nag";
 import { Construct } from "constructs";
 
 import { OSMLAccount } from "../types";
-import { DCDataplaneConfig } from "./dataplane";
+import { DataplaneConfig } from "./dataplane";
 
 /**
  * Properties for creating OpenSearch domain resources.
@@ -34,7 +34,7 @@ export interface OpenSearchProps {
   /** The security group for the OpenSearch domain. */
   readonly securityGroup: ISecurityGroup;
   /** The DC dataplane configuration. */
-  readonly config: DCDataplaneConfig;
+  readonly config: DataplaneConfig;
   /** The removal policy for resources. */
   readonly removalPolicy: RemovalPolicy;
 }

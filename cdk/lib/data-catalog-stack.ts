@@ -4,13 +4,12 @@
 
 import { App, Environment, Stack, StackProps } from "aws-cdk-lib";
 import { IVpc, SubnetSelection } from "aws-cdk-lib/aws-ec2";
-import { ITopic } from "aws-cdk-lib/aws-sns";
 import { NagSuppressions } from "cdk-nag";
 
 import { DeploymentConfig } from "../bin/deployment/load-deployment";
 import {
-  DCDataplane,
-  DCDataplaneConfig
+  Dataplane,
+  DataplaneConfig
 } from "./constructs/data-catalog/dataplane";
 
 export interface DataCatalogStackProps extends StackProps {
@@ -18,11 +17,10 @@ export interface DataCatalogStackProps extends StackProps {
   readonly deployment: DeploymentConfig;
   readonly vpc: IVpc; // VPC is now required and provided by NetworkStack
   readonly selectedSubnets: SubnetSelection; // Selected subnets from NetworkStack
-  readonly ingestTopic?: ITopic; // Optional ingest topic from DataIntakeStack
 }
 
 export class DataCatalogStack extends Stack {
-  public resources: DCDataplane;
+  public resources: Dataplane;
   public vpc: IVpc;
   public deployment: DeploymentConfig;
 
@@ -47,13 +45,12 @@ export class DataCatalogStack extends Stack {
 
     // Create the data catalog application dataplane using the VPC
     const dataplaneConfig = props.deployment.dataplaneConfig
-      ? new DCDataplaneConfig(props.deployment.dataplaneConfig)
+      ? new DataplaneConfig(props.deployment.dataplaneConfig)
       : undefined;
-    this.resources = new DCDataplane(this, "Dataplane", {
+    this.resources = new Dataplane(this, "Dataplane", {
       account: props.deployment.account,
       vpc: this.vpc,
       selectedSubnets: props.selectedSubnets,
-      ingestTopic: props.ingestTopic, // Use provided ingest topic from DataIntakeStack
       config: dataplaneConfig
     });
 

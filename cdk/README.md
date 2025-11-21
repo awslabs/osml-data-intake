@@ -107,26 +107,11 @@ Import an existing VPC with specific subnets and security group:
 
 This ensures efficient resource usage across both stacks while maintaining proper network isolation.
 
-### Data Intake Dataplane Configuration
+### Data Intake Configuration (Integrated)
 
-The CDK stack demonstrates the Data Intake Dataplane deployment. All configuration is centralized in the `deployment.json` file through the optional `dataIntakeConfig` section, which uses the `DIDataplaneConfig` type from the local constructs, eliminating the need to modify TypeScript code for customization.
+The Data Intake components are now integrated into the Data Catalog Dataplane. All configuration is centralized in the `deployment.json` file through the `dataplaneConfig` section.
 
-For the complete list of configuration parameters and their defaults, refer to the `DIDataplaneConfig` class in `lib/constructs/data-intake/dataplane.ts`.
-
-#### Example: Data Intake Custom Configuration
-
-To customize the Data Intake Dataplane, simply add the `dataIntakeConfig` section to your `deployment.json` file like the example below:
-
-```json
-{
-  "dataIntakeConfig": {
-    "BUILD_FROM_SOURCE": true,
-    "CONTAINER_BUILD_PATH": "../",
-    "CONTAINER_BUILD_TARGET": "intake",
-    "CONTAINER_DOCKERFILE": "docker/Dockerfile.intake"
-  }
-}
-```
+For the complete list of configuration parameters and their defaults, refer to the `DataplaneConfig` class in `lib/constructs/data-catalog/dataplane.ts`.
 
 #### Building Data Intake Containers from Source
 
@@ -134,7 +119,7 @@ By default, the CDK uses the pre-built container image from the registry. To bui
 
 ```json
 {
-  "dataIntakeConfig": {
+  "dataplaneConfig": {
     "BUILD_FROM_SOURCE": true
   }
 }
@@ -144,9 +129,9 @@ By default, the CDK uses the pre-built container image from the registry. To bui
 
 ### Data Catalog Dataplane Configuration
 
-The CDK stack demonstrates the Data Catalog Dataplane deployment. All configuration is centralized in the `deployment.json` file through the optional `dataplaneConfig` section, which uses the `DCDataplaneConfig` type from the local constructs, eliminating the need to modify TypeScript code for customization.
+The CDK stack demonstrates the Data Catalog Dataplane deployment. All configuration is centralized in the `deployment.json` file through the optional `dataplaneConfig` section, which uses the `DataplaneConfig` type from the local constructs, eliminating the need to modify TypeScript code for customization.
 
-For the complete list of configuration parameters and their defaults, refer to the `DCDataplaneConfig` class in `lib/constructs/data-catalog/dataplane.ts`.
+For the complete list of configuration parameters and their defaults, refer to the `DataplaneConfig` class in `lib/constructs/data-catalog/dataplane.ts`.
 
 #### Example: Data Catalog Custom Configuration
 
@@ -210,7 +195,7 @@ This command will:
 **Important**: The stacks have dependencies:
 
 - **NetworkStack** must be deployed first
-- **DataIntakeStack** must be deployed before **DataCatalogStack** (DataCatalogStack subscribes to DataIntakeStack's output topic)
+- **DataCatalogStack** depends on NetworkStack (includes both data-intake and data-catalog components)
 
 #### Automated Deployment
 
@@ -240,19 +225,16 @@ cdk
 │       ├── deployment.json.example   # Template for creating new configs
 │       └── load-deployment.ts        # Configuration loader and validator
 ├── lib/
-│   ├── data-intake-stack.ts          # Data Intake CDK stack
-│   ├── data-catalog-stack.ts         # Data Catalog CDK stack
+│   ├── data-catalog-stack.ts         # Data Catalog CDK stack (includes data-intake components)
 │   ├── network-stack.ts              # Network infrastructure CDK stack
 │   └── constructs/                   # Modular construct classes
 │       ├── types.ts                  # Common types and interfaces
-│       ├── data-intake/              # Data Intake constructs
-│       │   ├── dataplane.ts          # Main Data Intake Dataplane construct
-│       │   ├── lambda-function.ts    # Lambda function for data intake
-│       │   ├── lambda-role.ts        # IAM roles for Lambda functions
-│       │   └── metadata-storage.ts   # Metadata storage resources
-│       └── data-catalog/             # Data Catalog constructs
+│       └── data-catalog/             # Data Catalog constructs (includes intake components)
 │           ├── dataplane.ts          # Main Data Catalog Dataplane construct
 │           ├── container.ts          # Container resources
+│           ├── intake-function.ts   # Lambda function for data intake
+│           ├── intake-role.ts        # IAM roles for intake Lambda functions
+│           ├── metadata-storage.ts   # Metadata storage resources
 │           ├── ingest-function.ts    # Ingest Lambda function
 │           ├── ingest-role.ts        # IAM roles for ingest functions
 │           ├── network.ts            # Network - VPC and networking resources
@@ -276,26 +258,21 @@ This CDK project uses a **modular construct architecture** that separates concer
 
 ### Core Stacks
 
-- **`NetworkStack`** - Manages VPC creation or import (shared between Data Intake and Data Catalog stacks)
-- **`DataIntakeStack`** - Deploys data intake infrastructure (Lambda functions, S3 buckets, SNS topics)
-- **`DataCatalogStack`** - Deploys data catalog infrastructure (OpenSearch, STAC API, ingest functions)
+- **`NetworkStack`** - Manages VPC creation or import (shared with Data Catalog stack)
+- **`DataCatalogStack`** - Deploys both data-intake and data-catalog infrastructure (Lambda functions, S3 buckets, SNS topics, OpenSearch, STAC API, ingest functions)
 
-### Data Intake Constructs
+### Data Catalog Constructs (includes Data Intake)
 
-- **`DIDataplane`** - Main orchestrator that combines all Data Intake resources
-- **`LambdaFunction`** - Manages Lambda functions for data intake processing
-- **`DILambdaRole`** - IAM roles for Lambda functions
+- **`Dataplane`** - Main orchestrator that combines all Data Catalog and Data Intake resources
+- **`IntakeFunction`** - Manages Lambda functions for data intake processing
+- **`IntakeRole`** - IAM roles for intake Lambda functions
 - **`MetadataStorage`** - Manages S3 buckets and metadata storage resources
-
-### Data Catalog Constructs
-
-- **`DCDataplane`** - Main orchestrator that combines all Data Catalog resources
 - **`Network`** - Manages VPC creation or import
 - **`OpenSearch`** - Manages OpenSearch domain for catalog storage
 - **`StacApiGateway`** - Manages API Gateway for STAC API endpoints
 - **`StacFunction`** - Lambda functions for STAC API operations
 - **`IngestFunction`** - Lambda functions for data ingestion
-- **`Container`** - Container resources for ingest functions
+- **`Container`** - Container resources for Lambda functions
 - **`StacRole`** - IAM roles for STAC functions
 - **`IngestRole`** - IAM roles for ingest functions
 
@@ -304,8 +281,7 @@ This CDK project uses a **modular construct architecture** that separates concer
 The stacks are deployed in a specific order due to dependencies:
 
 1. **NetworkStack** - Creates or imports the VPC
-2. **DataIntakeStack** - Depends on NetworkStack, creates output SNS topic
-3. **DataCatalogStack** - Depends on both NetworkStack and DataIntakeStack, subscribes to DataIntakeStack's output topic
+2. **DataCatalogStack** - Depends on NetworkStack, includes both data-intake and data-catalog components
 
 ### Benefits
 
@@ -317,14 +293,14 @@ The stacks are deployed in a specific order due to dependencies:
 ### Usage Example
 
 ```typescript
-// Access specific resources through the main dataplanes
-const dataIntakeDataplane = new DIDataplane(this, "DataIntakeDataplane", { ... });
-const dataCatalogDataplane = new DCDataplane(this, "DataCatalogDataplane", { ... });
+// Access all resources through the unified dataplane
+const dataCatalogDataplane = new Dataplane(this, "DataCatalogDataplane", { ... });
 
 // Direct access to resource groups
-const lambdaFunctions = dataIntakeDataplane.lambdaFunction;
-const metadataStorage = dataIntakeDataplane.metadataStorage;
-const opensearch = dataCatalogDataplane.opensearch;
+const intakeLambda = dataCatalogDataplane.intakeFunction;
+const metadataStorage = dataCatalogDataplane.metadataStorage;
+const ingestLambda = dataCatalogDataplane.ingestFunction;
+const opensearch = dataCatalogDataplane.openSearchDomain;
 const stacApi = dataCatalogDataplane.stacApiGateway;
 ```
 

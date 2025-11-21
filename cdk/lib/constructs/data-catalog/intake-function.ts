@@ -15,14 +15,14 @@ import { ITopic } from "aws-cdk-lib/aws-sns";
 import { LambdaSubscription } from "aws-cdk-lib/aws-sns-subscriptions";
 import { Construct } from "constructs";
 
-import { Container } from "../data-catalog/container";
 import { OSMLAccount } from "../types";
-import { DIDataplaneConfig } from "./dataplane";
+import { Container } from "./container";
+import { DataplaneConfig } from "./dataplane";
 
 /**
- * Properties for creating Lambda function resources.
+ * Properties for creating the intake Lambda function.
  */
-export interface LambdaFunctionProps {
+export interface IntakeFunctionProps {
   /** The OSML account configuration. */
   readonly account: OSMLAccount;
   /** The VPC configuration. */
@@ -31,8 +31,8 @@ export interface LambdaFunctionProps {
   readonly selectedSubnets: SubnetSelection;
   /** The IAM role for the Lambda function. */
   readonly lambdaRole: IRole;
-  /** The container for the Lambda function. */
-  readonly container: Container;
+  /** The intake container. */
+  readonly intakeContainer: Container;
   /** The S3 output bucket. */
   readonly outputBucket: Bucket;
   /** The STAC SNS topic. */
@@ -41,52 +41,52 @@ export interface LambdaFunctionProps {
   readonly inputTopic: ITopic;
   /** The security group for the Lambda function (optional). */
   readonly securityGroup?: import("aws-cdk-lib/aws-ec2").ISecurityGroup;
-  /** The DI dataplane configuration. */
-  readonly config: DIDataplaneConfig;
+  /** The DC dataplane configuration. */
+  readonly config: DataplaneConfig;
 }
 
 /**
- * Construct that manages the Lambda function resource for the Data Intake.
+ * Construct that manages the intake Lambda function for the Data Catalog.
  *
  * This construct encapsulates the creation and configuration of the Lambda
- * function required by the Data Intake.
+ * function for data intake.
  */
-export class LambdaFunction extends Construct {
+export class IntakeFunction extends Construct {
   /** The Lambda function for data intake. */
-  public readonly lambdaFunction: Function;
+  public readonly function: Function;
 
   /**
-   * Creates a new LambdaFunction construct.
+   * Creates a new IntakeFunction construct.
    *
    * @param scope - The scope/stack in which to define this construct
    * @param id - The id of this construct within the current scope
    * @param props - The properties for configuring this construct
    */
-  constructor(scope: Construct, id: string, props: LambdaFunctionProps) {
+  constructor(scope: Construct, id: string, props: IntakeFunctionProps) {
     super(scope, id);
 
-    // Create the Lambda function with a container image
-    this.lambdaFunction = new DockerImageFunction(this, "DataIntakeFunction", {
-      code: props.container.dockerImageCode,
-      timeout: Duration.seconds(props.config.LAMBDA_TIMEOUT),
-      functionName: props.config.LAMBDA_FUNCTION_NAME,
+    // Create the intake Lambda function
+    this.function = new DockerImageFunction(this, "DataCatalogIntakeFunction", {
+      functionName: "data-catalog-intake",
+      code: props.intakeContainer.dockerImageCode,
+      role: props.lambdaRole,
+      vpc: props.vpc,
+      vpcSubnets: props.selectedSubnets,
+      timeout: Duration.seconds(props.config.INTAKE_LAMBDA_TIMEOUT),
+      ephemeralStorageSize: Size.gibibytes(
+        props.config.INTAKE_LAMBDA_STORAGE_SIZE
+      ),
+      memorySize: props.config.INTAKE_LAMBDA_MEMORY_SIZE,
       environment: {
         OUTPUT_BUCKET: props.outputBucket.bucketName,
         OUTPUT_TOPIC: props.stacTopic.topicArn
       },
-      memorySize: props.config.LAMBDA_MEMORY_SIZE,
-      ephemeralStorageSize: Size.gibibytes(props.config.LAMBDA_STORAGE_SIZE),
       securityGroups: props.securityGroup ? [props.securityGroup] : [],
-      vpc: props.vpc,
-      vpcSubnets: props.selectedSubnets,
-      role: props.lambdaRole,
       loggingFormat: LoggingFormat.JSON
     });
-    this.lambdaFunction.node.addDependency(props.container);
+    this.function.node.addDependency(props.intakeContainer);
 
     // Subscribe Lambda function to the SNS topic
-    props.inputTopic.addSubscription(
-      new LambdaSubscription(this.lambdaFunction)
-    );
+    props.inputTopic.addSubscription(new LambdaSubscription(this.function));
   }
 }
