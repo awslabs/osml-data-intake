@@ -7,7 +7,6 @@ from datetime import datetime, timezone
 from math import ceil, degrees, log
 from typing import Any, Dict, List, Optional
 
-import boto3
 from osgeo import gdal
 from stac_fastapi.types.stac import Item
 
@@ -196,45 +195,6 @@ class ImageData:
         """
         return os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION") or "us-west-2"
 
-    @staticmethod
-    def _discover_stac_api_url(region: str = None, export_name: str = "DC-StacApiUrl") -> Optional[str]:
-        """
-        Discover the STAC API URL from CloudFormation exports.
-
-        :param region: The AWS region to search in. If None, uses the region from environment or default.
-        :param export_name: The CloudFormation export name to look for (default: "DC-StacApiUrl").
-        :returns: The STAC API URL, or None if not found.
-        """
-        try:
-            if region is None:
-                region = ImageData._get_aws_region()
-
-            cf_client = boto3.client("cloudformation", region_name=region)
-
-            # List all exports
-            response = cf_client.list_exports()
-
-            for export in response.get("Exports", []):
-                if export["Name"] == export_name:
-                    logger.info(f"Found STAC API URL from CloudFormation export: {export['Value']}")
-                    return export["Value"]
-
-            # If not found in first page, paginate through all exports
-            next_token = response.get("NextToken")
-            while next_token:
-                response = cf_client.list_exports(NextToken=next_token)
-                for export in response.get("Exports", []):
-                    if export["Name"] == export_name:
-                        logger.info(f"Found STAC API URL from CloudFormation export: {export['Value']}")
-                        return export["Value"]
-                next_token = response.get("NextToken")
-
-            logger.warning(f"STAC API URL not found in CloudFormation exports (looking for '{export_name}')")
-            return None
-        except Exception as e:
-            logger.warning(f"Error discovering STAC API URL from CloudFormation: {e}")
-            return None
-
     def generate_stac_item(self, s3_manager: S3Manager, request: SNSRequest, ovr_file, stac_catalog: str = ".") -> Item:
         """
         Create and publish a STAC item using the configured SNS manager.
@@ -288,22 +248,17 @@ class ImageData:
                 "roles": ["data"],
             }
 
-        # Discover STAC API URL if not provided
+        # Get STAC API URL from environment variable (set by CDK construct)
         if stac_catalog == ".":
-            region = self._get_aws_region()
-            stac_api_url = self._discover_stac_api_url(region=region)
-            if stac_api_url:
-                stac_catalog = stac_api_url.rstrip("/")
-                logger.info(f"Using discovered STAC API URL: {stac_catalog}")
+            stac_catalog = os.getenv("STAC_API_URL") or os.getenv("STAC_ENDPOINT")
+            if stac_catalog:
+                stac_catalog = stac_catalog.rstrip("/")
+                logger.info(f"Using STAC API URL from environment variable: {stac_catalog}")
             else:
-                # Try environment variable as fallback
-                stac_catalog = os.getenv("STAC_API_URL") or os.getenv("STAC_ENDPOINT")
-                if stac_catalog:
-                    stac_catalog = stac_catalog.rstrip("/")
-                    logger.info(f"Using STAC API URL from environment variable: {stac_catalog}")
-                else:
-                    logger.warning("Could not determine STAC API URL - using relative paths (may cause validation issues)")
-                    stac_catalog = None
+                logger.warning(
+                    "STAC_API_URL environment variable not set - using relative paths (may cause validation issues)"
+                )
+                stac_catalog = None
 
         # Build hrefs - use absolute URLs when catalog is available, otherwise relative paths
         if stac_catalog and stac_catalog != ".":

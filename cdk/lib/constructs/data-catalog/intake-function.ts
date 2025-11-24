@@ -4,7 +4,7 @@
 
 import { Duration, Size } from "aws-cdk-lib";
 import { IVpc, SubnetSelection } from "aws-cdk-lib/aws-ec2";
-import { IRole } from "aws-cdk-lib/aws-iam";
+import { IRole, Role } from "aws-cdk-lib/aws-iam";
 import {
   DockerImageFunction,
   Function,
@@ -16,8 +16,9 @@ import { LambdaSubscription } from "aws-cdk-lib/aws-sns-subscriptions";
 import { Construct } from "constructs";
 
 import { OSMLAccount } from "../types";
-import { Container } from "./container";
+import { Container, ContainerConfig } from "./container";
 import { DataplaneConfig } from "./dataplane";
+import { IntakeRole } from "./intake-role";
 
 /**
  * Properties for creating the intake Lambda function.
@@ -29,10 +30,6 @@ export interface IntakeFunctionProps {
   readonly vpc: IVpc;
   /** The selected subnets for the VPC. */
   readonly selectedSubnets: SubnetSelection;
-  /** The IAM role for the Lambda function. */
-  readonly lambdaRole: IRole;
-  /** The intake container. */
-  readonly intakeContainer: Container;
   /** The S3 output bucket. */
   readonly outputBucket: Bucket;
   /** The STAC SNS topic. */
@@ -43,6 +40,8 @@ export interface IntakeFunctionProps {
   readonly securityGroup?: import("aws-cdk-lib/aws-ec2").ISecurityGroup;
   /** The DC dataplane configuration. */
   readonly config: DataplaneConfig;
+  /** The STAC API Gateway URL (optional). */
+  readonly stacApiUrl?: string;
 }
 
 /**
@@ -54,6 +53,10 @@ export interface IntakeFunctionProps {
 export class IntakeFunction extends Construct {
   /** The Lambda function for data intake. */
   public readonly function: Function;
+  /** The IAM role for the Lambda function. */
+  public readonly role: IRole;
+  /** The container for the Lambda function. */
+  public readonly container: Container;
 
   /**
    * Creates a new IntakeFunction construct.
@@ -65,11 +68,17 @@ export class IntakeFunction extends Construct {
   constructor(scope: Construct, id: string, props: IntakeFunctionProps) {
     super(scope, id);
 
+    // Initialize the Lambda role
+    this.role = this.initializeRole(props);
+
+    // Create the intake container
+    this.container = this.createContainer(props);
+
     // Create the intake Lambda function
     this.function = new DockerImageFunction(this, "DataCatalogIntakeFunction", {
       functionName: "data-catalog-intake",
-      code: props.intakeContainer.dockerImageCode,
-      role: props.lambdaRole,
+      code: this.container.dockerImageCode,
+      role: this.role,
       vpc: props.vpc,
       vpcSubnets: props.selectedSubnets,
       timeout: Duration.seconds(props.config.INTAKE_LAMBDA_TIMEOUT),
@@ -79,14 +88,60 @@ export class IntakeFunction extends Construct {
       memorySize: props.config.INTAKE_LAMBDA_MEMORY_SIZE,
       environment: {
         OUTPUT_BUCKET: props.outputBucket.bucketName,
-        OUTPUT_TOPIC: props.stacTopic.topicArn
+        OUTPUT_TOPIC: props.stacTopic.topicArn,
+        ...(props.stacApiUrl && { STAC_API_URL: props.stacApiUrl })
       },
       securityGroups: props.securityGroup ? [props.securityGroup] : [],
       loggingFormat: LoggingFormat.JSON
     });
-    this.function.node.addDependency(props.intakeContainer);
+    this.function.node.addDependency(this.container);
 
     // Subscribe Lambda function to the SNS topic
     props.inputTopic.addSubscription(new LambdaSubscription(this.function));
+  }
+
+  /**
+   * Initializes the intake Lambda role.
+   *
+   * @param props - The IntakeFunction properties
+   * @returns The intake Lambda role
+   */
+  private initializeRole(props: IntakeFunctionProps): IRole {
+    if (
+      props.config.INTAKE_LAMBDA_ROLE_NAME &&
+      props.config.INTAKE_LAMBDA_ROLE_NAME !== undefined &&
+      props.config.INTAKE_LAMBDA_ROLE_NAME !== ""
+    ) {
+      return Role.fromRoleName(
+        this,
+        "ImportedIntakeRole",
+        props.config.INTAKE_LAMBDA_ROLE_NAME,
+        { mutable: false }
+      );
+    }
+    return new IntakeRole(this, "IntakeRole", {
+      account: props.account,
+      roleName: "IntakeLambdaRole"
+    }).role;
+  }
+
+  /**
+   * Creates the intake container.
+   *
+   * @param props - The IntakeFunction properties
+   * @returns The intake container
+   */
+  private createContainer(props: IntakeFunctionProps): Container {
+    return new Container(this, "IntakeContainer", {
+      account: props.account,
+      buildDockerImageCode: true,
+      buildFromSource: props.config.BUILD_FROM_SOURCE,
+      config: new ContainerConfig({
+        CONTAINER_URI: props.config.INTAKE_CONTAINER_URI,
+        CONTAINER_BUILD_PATH: props.config.CONTAINER_BUILD_PATH,
+        CONTAINER_BUILD_TARGET: props.config.INTAKE_CONTAINER_BUILD_TARGET,
+        CONTAINER_DOCKERFILE: props.config.INTAKE_CONTAINER_DOCKERFILE
+      })
+    });
   }
 }

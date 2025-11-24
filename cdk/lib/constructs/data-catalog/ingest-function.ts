@@ -3,8 +3,13 @@
  */
 
 import { Duration, Size } from "aws-cdk-lib";
-import { IVpc, Port, SubnetSelection } from "aws-cdk-lib/aws-ec2";
-import { IRole } from "aws-cdk-lib/aws-iam";
+import {
+  ISecurityGroup,
+  IVpc,
+  Port,
+  SubnetSelection
+} from "aws-cdk-lib/aws-ec2";
+import { IRole, Role } from "aws-cdk-lib/aws-iam";
 import {
   DockerImageFunction,
   Function,
@@ -16,8 +21,9 @@ import { LambdaSubscription } from "aws-cdk-lib/aws-sns-subscriptions";
 import { Construct } from "constructs";
 
 import { OSMLAccount } from "../types";
-import { Container } from "./container";
+import { Container, ContainerConfig } from "./container";
 import { DataplaneConfig } from "./dataplane";
+import { IngestRole } from "./ingest-role";
 
 /**
  * Properties for creating the ingest Lambda function.
@@ -29,14 +35,12 @@ export interface IngestFunctionProps {
   readonly vpc: IVpc;
   /** The selected subnets for the VPC. */
   readonly selectedSubnets: SubnetSelection;
-  /** The IAM role for the Lambda function. */
-  readonly lambdaRole: IRole;
-  /** The ingest container. */
-  readonly ingestContainer: Container;
   /** The OpenSearch domain. */
   readonly osDomain: Domain;
   /** The ingest SNS topic. */
   readonly ingestTopic: ITopic;
+  /** The security group for the Lambda function (optional). */
+  readonly securityGroup?: ISecurityGroup;
   /** The DC dataplane configuration. */
   readonly config: DataplaneConfig;
 }
@@ -50,6 +54,10 @@ export interface IngestFunctionProps {
 export class IngestFunction extends Construct {
   /** The Lambda function for ingesting STAC items. */
   public readonly function: Function;
+  /** The IAM role for the Lambda function. */
+  public readonly role: IRole;
+  /** The container for the Lambda function. */
+  public readonly container: Container;
 
   /**
    * Creates a new IngestFunction construct.
@@ -60,6 +68,12 @@ export class IngestFunction extends Construct {
    */
   constructor(scope: Construct, id: string, props: IngestFunctionProps) {
     super(scope, id);
+
+    // Initialize the Lambda role
+    this.role = this.initializeRole(props);
+
+    // Create the ingest container
+    this.container = this.createContainer(props);
 
     // Create an operating ENV for our lambda container
     const env = {
@@ -79,21 +93,69 @@ export class IngestFunction extends Construct {
     // Create the ingest Lambda function
     this.function = new DockerImageFunction(this, "DataCatalogIngestFunction", {
       functionName: "data-catalog-ingest",
-      code: props.ingestContainer.dockerImageCode,
-      role: props.lambdaRole,
+      code: this.container.dockerImageCode,
+      role: this.role,
       vpc: props.vpc,
-      timeout: Duration.seconds(props.config.LAMBDA_TIMEOUT),
-      ephemeralStorageSize: Size.gibibytes(props.config.LAMBDA_STORAGE_SIZE),
-      memorySize: props.config.LAMBDA_MEMORY_SIZE,
+      timeout: Duration.seconds(props.config.INGEST_LAMBDA_TIMEOUT),
+      ephemeralStorageSize: Size.gibibytes(
+        props.config.INGEST_LAMBDA_STORAGE_SIZE
+      ),
+      memorySize: props.config.INGEST_LAMBDA_MEMORY_SIZE,
       environment: env,
+      securityGroups: props.securityGroup ? [props.securityGroup] : [],
       loggingFormat: LoggingFormat.JSON
     });
-    this.function.node.addDependency(props.ingestContainer);
+    this.function.node.addDependency(this.container);
 
     // Subscribe Lambda function to the SNS topic
     props.ingestTopic.addSubscription(new LambdaSubscription(this.function));
 
     // Allow the ingest Lambda to connect to OpenSearch
     props.osDomain.connections.allowFrom(this.function, Port.tcp(443));
+  }
+
+  /**
+   * Initializes the ingest Lambda role.
+   *
+   * @param props - The IngestFunction properties
+   * @returns The ingest Lambda role
+   */
+  private initializeRole(props: IngestFunctionProps): IRole {
+    if (
+      props.config.INGEST_LAMBDA_ROLE_NAME &&
+      props.config.INGEST_LAMBDA_ROLE_NAME !== undefined &&
+      props.config.INGEST_LAMBDA_ROLE_NAME !== ""
+    ) {
+      return Role.fromRoleName(
+        this,
+        "ImportedIngestFunctionRole",
+        props.config.INGEST_LAMBDA_ROLE_NAME,
+        { mutable: false }
+      );
+    }
+    return new IngestRole(this, "IngestFunctionRole", {
+      account: props.account,
+      roleName: "IngestFunctionRole"
+    }).role;
+  }
+
+  /**
+   * Creates the ingest container.
+   *
+   * @param props - The IngestFunction properties
+   * @returns The ingest container
+   */
+  private createContainer(props: IngestFunctionProps): Container {
+    return new Container(this, "IngestContainer", {
+      account: props.account,
+      buildDockerImageCode: true,
+      buildFromSource: props.config.BUILD_FROM_SOURCE,
+      config: new ContainerConfig({
+        CONTAINER_URI: props.config.INGEST_CONTAINER_URI,
+        CONTAINER_BUILD_PATH: props.config.CONTAINER_BUILD_PATH,
+        CONTAINER_BUILD_TARGET: props.config.INGEST_CONTAINER_BUILD_TARGET,
+        CONTAINER_DOCKERFILE: props.config.INGEST_CONTAINER_DOCKERFILE
+      })
+    });
   }
 }

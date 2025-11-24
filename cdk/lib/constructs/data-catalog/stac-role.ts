@@ -141,10 +141,8 @@ export class StacRole extends Construct {
     role.addManagedPolicy(policy);
 
     // Build appliesTo array for IAM5 suppressions
+    // Note: OpenSearch domain ARN is a token and cannot be matched exactly in appliesTo
     const iam5Resources = [`Resource::arn:${this.partition}:s3:::*`];
-    if (props.openSearchDomainArn) {
-      iam5Resources.push(`Resource::${props.openSearchDomainArn}/*`);
-    }
 
     // Add cdk-nag suppressions
     NagSuppressions.addResourceSuppressions(
@@ -169,14 +167,14 @@ export class StacRole extends Construct {
       true
     );
 
+    // Suppress IAM5 for policy - without appliesTo for OpenSearch since domain ARN is a token
     NagSuppressions.addResourceSuppressions(
       policy,
       [
         {
           id: "AwsSolutions-IAM5",
           reason:
-            "Wildcard permissions are required for S3 as the STAC API Lambda needs to serve STAC items/assets from multiple buckets. OpenSearch permissions are scoped to the specific domain. The Lambda is deployed in a VPC with restricted network access.",
-          appliesTo: iam5Resources
+            "Wildcard permissions are required for S3 as the STAC API Lambda needs to serve STAC items/assets from multiple buckets. OpenSearch permissions (es:ESHttp* and resource wildcard) are scoped to the specific domain ARN but cannot be matched in appliesTo due to token resolution. The Lambda is deployed in a VPC with restricted network access."
         }
       ],
       true

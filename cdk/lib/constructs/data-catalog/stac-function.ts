@@ -3,20 +3,25 @@
  */
 
 import { Duration, Size } from "aws-cdk-lib";
-import { IVpc, Port, SubnetSelection } from "aws-cdk-lib/aws-ec2";
-import { Effect, IRole, Policy, PolicyStatement } from "aws-cdk-lib/aws-iam";
+import {
+  ISecurityGroup,
+  IVpc,
+  Port,
+  SubnetSelection
+} from "aws-cdk-lib/aws-ec2";
+import { IRole, Role } from "aws-cdk-lib/aws-iam";
 import {
   DockerImageFunction,
   Function,
   LoggingFormat
 } from "aws-cdk-lib/aws-lambda";
 import { Domain } from "aws-cdk-lib/aws-opensearchservice";
-import { NagSuppressions } from "cdk-nag";
 import { Construct } from "constructs";
 
 import { OSMLAccount } from "../types";
-import { Container } from "./container";
+import { Container, ContainerConfig } from "./container";
 import { DataplaneConfig } from "./dataplane";
+import { StacRole } from "./stac-role";
 
 /**
  * Properties for creating the STAC Lambda function.
@@ -28,12 +33,10 @@ export interface StacFunctionProps {
   readonly vpc: IVpc;
   /** The selected subnets for the VPC. */
   readonly selectedSubnets: SubnetSelection;
-  /** The IAM role for the Lambda function. */
-  readonly lambdaRole: IRole;
-  /** The STAC container. */
-  readonly stacContainer: Container;
   /** The OpenSearch domain. */
   readonly osDomain: Domain;
+  /** The security group for the Lambda function (optional). */
+  readonly securityGroup?: ISecurityGroup;
   /** The DC dataplane configuration. */
   readonly config: DataplaneConfig;
 }
@@ -47,6 +50,10 @@ export interface StacFunctionProps {
 export class StacFunction extends Construct {
   /** The Lambda function for the STAC API. */
   public readonly function: Function;
+  /** The IAM role for the Lambda function. */
+  public readonly role: IRole;
+  /** The container for the Lambda function. */
+  public readonly container: Container;
 
   /**
    * Creates a new StacFunction construct.
@@ -57,6 +64,12 @@ export class StacFunction extends Construct {
    */
   constructor(scope: Construct, id: string, props: StacFunctionProps) {
     super(scope, id);
+
+    // Initialize the Lambda role
+    this.role = this.initializeRole(props);
+
+    // Create the STAC container
+    this.container = this.createContainer(props);
 
     // Create an operating ENV for our lambda container
     const env = {
@@ -76,47 +89,68 @@ export class StacFunction extends Construct {
     // Create the STAC API Lambda function
     this.function = new DockerImageFunction(this, "DataCatalogStacFunction", {
       functionName: "data-catalog-stac",
-      code: props.stacContainer.dockerImageCode,
-      role: props.lambdaRole,
+      code: this.container.dockerImageCode,
+      role: this.role,
       vpc: props.vpc,
       vpcSubnets: props.selectedSubnets,
-      timeout: Duration.seconds(props.config.LAMBDA_TIMEOUT),
-      ephemeralStorageSize: Size.gibibytes(props.config.LAMBDA_STORAGE_SIZE),
-      memorySize: props.config.LAMBDA_MEMORY_SIZE,
+      timeout: Duration.seconds(props.config.STAC_LAMBDA_TIMEOUT),
+      ephemeralStorageSize: Size.gibibytes(
+        props.config.STAC_LAMBDA_STORAGE_SIZE
+      ),
+      memorySize: props.config.STAC_LAMBDA_MEMORY_SIZE,
       environment: env,
+      securityGroups: props.securityGroup ? [props.securityGroup] : [],
       loggingFormat: LoggingFormat.JSON
     });
-    this.function.node.addDependency(props.stacContainer);
+    this.function.node.addDependency(this.container);
 
     // Allow the STAC Lambda to connect to OpenSearch
     props.osDomain.connections.allowFrom(this.function, Port.tcp(443));
+  }
 
-    // Grant OpenSearch permissions to the Lambda role
-    // This is required for the Lambda to query OpenSearch via IAM authentication
-    const openSearchPolicy = new Policy(this, "StacOpenSearchPolicy", {
-      statements: [
-        new PolicyStatement({
-          effect: Effect.ALLOW,
-          actions: ["es:ESHttp*"],
-          resources: [`${props.osDomain.domainArn}/*`]
-        })
-      ],
-      roles: [props.lambdaRole]
+  /**
+   * Initializes the STAC Lambda role.
+   *
+   * @param props - The StacFunction properties
+   * @returns The STAC Lambda role
+   */
+  private initializeRole(props: StacFunctionProps): IRole {
+    if (
+      props.config.STAC_LAMBDA_ROLE_NAME &&
+      props.config.STAC_LAMBDA_ROLE_NAME !== undefined &&
+      props.config.STAC_LAMBDA_ROLE_NAME !== ""
+    ) {
+      return Role.fromRoleName(
+        this,
+        "ImportedSTACFunctionRole",
+        props.config.STAC_LAMBDA_ROLE_NAME,
+        { mutable: false }
+      );
+    }
+    return new StacRole(this, "STACFunctionRole", {
+      account: props.account,
+      roleName: "STACFunctionRole",
+      openSearchDomainArn: props.osDomain.domainArn
+    }).role;
+  }
+
+  /**
+   * Creates the STAC container.
+   *
+   * @param props - The StacFunction properties
+   * @returns The STAC container
+   */
+  private createContainer(props: StacFunctionProps): Container {
+    return new Container(this, "STACContainer", {
+      account: props.account,
+      buildDockerImageCode: true,
+      buildFromSource: props.config.BUILD_FROM_SOURCE,
+      config: new ContainerConfig({
+        CONTAINER_URI: props.config.STAC_CONTAINER_URI,
+        CONTAINER_BUILD_PATH: props.config.CONTAINER_BUILD_PATH,
+        CONTAINER_BUILD_TARGET: props.config.STAC_CONTAINER_BUILD_TARGET,
+        CONTAINER_DOCKERFILE: props.config.STAC_CONTAINER_DOCKERFILE
+      })
     });
-
-    // Note: Suppressing IAM5 without appliesTo because the domain ARN is a token
-    // and cannot be matched exactly. This policy only contains OpenSearch wildcard
-    // permissions scoped to the specific domain, which is acceptable.
-    NagSuppressions.addResourceSuppressions(
-      openSearchPolicy,
-      [
-        {
-          id: "AwsSolutions-IAM5",
-          reason:
-            "Wildcard permissions on OpenSearch domain are required as the STAC API Lambda needs to perform various operations (GET, POST, PUT, DELETE) on different indices and paths within the domain. The permissions are scoped to the specific OpenSearch domain ARN. Action wildcard (es:ESHttp*) is needed for all HTTP methods, and resource wildcard (*) is needed for all indices and paths within the domain."
-        }
-      ],
-      true
-    );
   }
 }

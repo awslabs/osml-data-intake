@@ -9,22 +9,17 @@ import {
   SecurityGroup,
   SubnetSelection
 } from "aws-cdk-lib/aws-ec2";
-import { IRole, Role } from "aws-cdk-lib/aws-iam";
 import { ITopic, Topic } from "aws-cdk-lib/aws-sns";
 import { NagSuppressions } from "cdk-nag";
 import { Construct } from "constructs";
 
 import { BaseConfig, ConfigType, OSMLAccount } from "../types";
-import { Container } from "./container";
 import { IngestFunction } from "./ingest-function";
-import { IngestRole } from "./ingest-role";
 import { IntakeFunction } from "./intake-function";
-import { IntakeRole } from "./intake-role";
 import { MetadataStorage } from "./metadata-storage";
 import { OpenSearch } from "./opensearch";
 import { StacApiGateway } from "./stac-api-gateway";
 import { StacFunction } from "./stac-function";
-import { StacRole } from "./stac-role";
 
 /**
  * Represents the configuration for the Dataplane Construct.
@@ -68,10 +63,10 @@ export class DataplaneConfig extends BaseConfig {
   public INTAKE_LAMBDA_MEMORY_SIZE: number;
 
   /**
-   * The name of the DI Lambda execution role.
+   * The name of the Intake Lambda execution role to import.
    * @default undefined
    */
-  public INTAKE_LAMBDA_ROLE_NAME?: string | undefined;
+  public INTAKE_LAMBDA_ROLE_NAME: string | undefined;
 
   /**
    * The size of the storage to assign intake lambda runtime in GB.
@@ -122,10 +117,10 @@ export class DataplaneConfig extends BaseConfig {
   public INGEST_CONTAINER_URI: string;
 
   /**
-   * The memory size of the Lambda function (MB).
+   * The memory size of the Ingest Lambda function (MB).
    * @default 4096
    */
-  public LAMBDA_MEMORY_SIZE: number;
+  public INGEST_LAMBDA_MEMORY_SIZE: number;
 
   /**
    * The security group ID to use for the Lambda container.
@@ -134,22 +129,46 @@ export class DataplaneConfig extends BaseConfig {
   public LAMBDA_SECURITY_GROUP_ID?: string | undefined;
 
   /**
-   * The name of the Lambda role.
-   * @default "DCLambdaRole"
+   * The name of the Ingest Lambda role to import.
+   * @default undefined
    */
-  public LAMBDA_ROLE_NAME: string;
+  public INGEST_LAMBDA_ROLE_NAME: string | undefined;
 
   /**
-   * The storage size of the Lambda function (GB).
+   * The storage size of the Ingest Lambda function (GB).
    * @default 10
    */
-  public LAMBDA_STORAGE_SIZE: number;
+  public INGEST_LAMBDA_STORAGE_SIZE: number;
 
   /**
-   * The timeout of the Lambda function (Seconds).
+   * The timeout of the Ingest Lambda function (Seconds).
    * @default 300
    */
-  public LAMBDA_TIMEOUT: number;
+  public INGEST_LAMBDA_TIMEOUT: number;
+
+  /**
+   * The memory size of the STAC Lambda function (MB).
+   * @default 4096
+   */
+  public STAC_LAMBDA_MEMORY_SIZE: number;
+
+  /**
+   * The name of the STAC Lambda role to import.
+   * @default undefined
+   */
+  public STAC_LAMBDA_ROLE_NAME: string | undefined;
+
+  /**
+   * The storage size of the STAC Lambda function (GB).
+   * @default 10
+   */
+  public STAC_LAMBDA_STORAGE_SIZE: number;
+
+  /**
+   * The timeout of the STAC Lambda function (Seconds).
+   * @default 300
+   */
+  public STAC_LAMBDA_TIMEOUT: number;
 
   /**
    * The number of data nodes in the OpenSearch cluster.
@@ -258,9 +277,12 @@ export class DataplaneConfig extends BaseConfig {
       INTAKE_LAMBDA_MEMORY_SIZE: 1024,
       INTAKE_LAMBDA_STORAGE_SIZE: 10,
       INTAKE_LAMBDA_TIMEOUT: 900,
-      LAMBDA_MEMORY_SIZE: 4096,
-      LAMBDA_STORAGE_SIZE: 10,
-      LAMBDA_TIMEOUT: 300,
+      INGEST_LAMBDA_MEMORY_SIZE: 4096,
+      INGEST_LAMBDA_STORAGE_SIZE: 10,
+      INGEST_LAMBDA_TIMEOUT: 300,
+      STAC_LAMBDA_MEMORY_SIZE: 4096,
+      STAC_LAMBDA_STORAGE_SIZE: 10,
+      STAC_LAMBDA_TIMEOUT: 300,
       OS_DATA_NODES: 4,
       S3_OUTPUT_BUCKET_NAME: "metadata-storage",
       SNS_INPUT_TOPIC_NAME: "data-catalog-intake",
@@ -332,12 +354,6 @@ export class Dataplane extends Construct {
   public readonly removalPolicy: RemovalPolicy;
   /** The security group associated with the resources created by this construct. */
   public readonly securityGroup: ISecurityGroup;
-  /** IAM role used by the intake Lambda function. */
-  public readonly intakeLambdaRole: IRole;
-  /** IAM role used by the ingest Lambda function. */
-  public readonly ingestLambdaRole: IRole;
-  /** IAM role used by the STAC Lambda function. */
-  public readonly stacLambdaRole: IRole;
 
   // Resource classes
   /** The SNS topic for input data intake requests. */
@@ -346,12 +362,6 @@ export class Dataplane extends Construct {
   public readonly ingestTopic: ITopic;
   /** The metadata storage resource (S3 bucket). */
   public readonly metadataStorage: MetadataStorage;
-  /** The container for the intake Lambda function. */
-  public readonly intakeContainer: Container;
-  /** The container for the ingest Lambda function. */
-  public readonly ingestContainer: Container;
-  /** The container for the STAC API Lambda function. */
-  public readonly stacContainer: Container;
   /** The OpenSearch domain. */
   public readonly openSearchDomain: OpenSearch;
   /** The intake Lambda function. */
@@ -377,22 +387,16 @@ export class Dataplane extends Construct {
     this.config = this.initializeConfig(props);
     this.removalPolicy = this.initializeRemovalPolicy(props);
     this.securityGroup = this.initializeSecurityGroup(props);
-    this.intakeLambdaRole = this.initializeIntakeLambdaRole(props);
-    this.ingestLambdaRole = this.initializeIngestLambdaRole(props);
-    this.stacLambdaRole = this.initializeStacLambdaRole(props);
 
     // Create resource classes
     this.inputTopic = this.createInputTopic();
     this.ingestTopic = this.createIngestTopic(props);
     this.metadataStorage = this.createMetadataStorage(props);
-    this.intakeContainer = this.createIntakeContainer(props);
-    this.ingestContainer = this.createIngestContainer(props);
-    this.stacContainer = this.createStacContainer(props);
     this.openSearchDomain = this.createOpenSearchDomain(props);
-    this.intakeFunction = this.createIntakeFunction(props);
-    this.ingestFunction = this.createIngestFunction(props);
     this.stacFunction = this.createStacFunction(props);
     this.stacApiGateway = this.createStacApiGateway(props);
+    this.intakeFunction = this.createIntakeFunction(props);
+    this.ingestFunction = this.createIngestFunction(props);
   }
 
   /**
@@ -436,85 +440,9 @@ export class Dataplane extends Construct {
         this.config.LAMBDA_SECURITY_GROUP_ID
       );
     }
-    return new SecurityGroup(this, "DCOSSecurityGroup", {
+    return new SecurityGroup(this, "DCSecurityGroup", {
       vpc: props.vpc
     });
-  }
-
-  /**
-   * Initializes the intake Lambda role.
-   *
-   * @param props - The Dataplane properties
-   * @returns The intake Lambda role
-   */
-  private initializeIntakeLambdaRole(props: DataplaneProps): IRole {
-    if (
-      this.config.INTAKE_LAMBDA_ROLE_NAME &&
-      this.config.INTAKE_LAMBDA_ROLE_NAME !== undefined &&
-      this.config.INTAKE_LAMBDA_ROLE_NAME !== ""
-    ) {
-      return Role.fromRoleName(
-        this,
-        "ImportedDCIntakeLambdaRole",
-        this.config.INTAKE_LAMBDA_ROLE_NAME,
-        { mutable: false }
-      );
-    }
-    return new IntakeRole(this, "IntakeRole", {
-      account: props.account,
-      roleName: "DCIntakeLambdaRole"
-    }).role;
-  }
-
-  /**
-   * Initializes the ingest Lambda role.
-   *
-   * @param props - The Dataplane properties
-   * @returns The ingest Lambda role
-   */
-  private initializeIngestLambdaRole(props: DataplaneProps): IRole {
-    if (
-      this.config.LAMBDA_ROLE_NAME &&
-      this.config.LAMBDA_ROLE_NAME !== undefined &&
-      this.config.LAMBDA_ROLE_NAME !== ""
-    ) {
-      return Role.fromRoleName(
-        this,
-        "ImportedDCIngestLambdaRole",
-        this.config.LAMBDA_ROLE_NAME,
-        { mutable: false }
-      );
-    }
-    return new IngestRole(this, "IngestRole", {
-      account: props.account,
-      roleName: "DCIngestLambdaRole"
-    }).role;
-  }
-
-  /**
-   * Initializes the STAC Lambda role.
-   *
-   * @param props - The Dataplane properties
-   * @returns The STAC Lambda role
-   */
-  private initializeStacLambdaRole(props: DataplaneProps): IRole {
-    if (
-      this.config.LAMBDA_ROLE_NAME &&
-      this.config.LAMBDA_ROLE_NAME !== undefined &&
-      this.config.LAMBDA_ROLE_NAME !== ""
-    ) {
-      // If a single role name is provided, use it for both (backward compatibility)
-      return Role.fromRoleName(
-        this,
-        "ImportedDCStacLambdaRole",
-        this.config.LAMBDA_ROLE_NAME,
-        { mutable: false }
-      );
-    }
-    return new StacRole(this, "StacRole", {
-      account: props.account,
-      roleName: "DCStacLambdaRole"
-    }).role;
   }
 
   /**
@@ -523,7 +451,7 @@ export class Dataplane extends Construct {
    * @returns The input SNS topic
    */
   private createInputTopic(): ITopic {
-    const topic = new Topic(this, "DCInputTopic", {
+    const topic = new Topic(this, "InputTopic", {
       topicName: this.config.SNS_INPUT_TOPIC_NAME
     });
 
@@ -558,7 +486,7 @@ export class Dataplane extends Construct {
     if (props.ingestTopic) {
       return props.ingestTopic;
     }
-    const topic = new Topic(this, "DCIngestTopic", {
+    const topic = new Topic(this, "IngestTopic", {
       topicName: this.config.SNS_INGEST_TOPIC_NAME
     });
 
@@ -598,66 +526,6 @@ export class Dataplane extends Construct {
   }
 
   /**
-   * Creates the intake container.
-   *
-   * @param props - The Dataplane properties
-   * @returns The intake container
-   */
-  private createIntakeContainer(props: DataplaneProps): Container {
-    return new Container(this, "DCIntakeContainer", {
-      account: props.account,
-      buildDockerImageCode: true,
-      buildFromSource: this.config.BUILD_FROM_SOURCE,
-      config: {
-        CONTAINER_URI: this.config.INTAKE_CONTAINER_URI,
-        CONTAINER_BUILD_PATH: this.config.CONTAINER_BUILD_PATH,
-        CONTAINER_BUILD_TARGET: this.config.INTAKE_CONTAINER_BUILD_TARGET,
-        CONTAINER_DOCKERFILE: this.config.INTAKE_CONTAINER_DOCKERFILE
-      }
-    });
-  }
-
-  /**
-   * Creates the ingest container.
-   *
-   * @param props - The Dataplane properties
-   * @returns The ingest container
-   */
-  private createIngestContainer(props: DataplaneProps): Container {
-    return new Container(this, "DCIngestContainer", {
-      account: props.account,
-      buildDockerImageCode: true,
-      buildFromSource: this.config.BUILD_FROM_SOURCE,
-      config: {
-        CONTAINER_URI: this.config.INGEST_CONTAINER_URI,
-        CONTAINER_BUILD_PATH: this.config.CONTAINER_BUILD_PATH,
-        CONTAINER_BUILD_TARGET: this.config.INGEST_CONTAINER_BUILD_TARGET,
-        CONTAINER_DOCKERFILE: this.config.INGEST_CONTAINER_DOCKERFILE
-      }
-    });
-  }
-
-  /**
-   * Creates the STAC container.
-   *
-   * @param props - The Dataplane properties
-   * @returns The STAC container
-   */
-  private createStacContainer(props: DataplaneProps): Container {
-    return new Container(this, "DCSTACContainer", {
-      account: props.account,
-      buildDockerImageCode: true,
-      buildFromSource: this.config.BUILD_FROM_SOURCE,
-      config: {
-        CONTAINER_URI: this.config.STAC_CONTAINER_URI,
-        CONTAINER_BUILD_PATH: this.config.CONTAINER_BUILD_PATH,
-        CONTAINER_BUILD_TARGET: this.config.STAC_CONTAINER_BUILD_TARGET,
-        CONTAINER_DOCKERFILE: this.config.STAC_CONTAINER_DOCKERFILE
-      }
-    });
-  }
-
-  /**
    * Creates the OpenSearch domain.
    *
    * @param props - The Dataplane properties
@@ -685,13 +553,12 @@ export class Dataplane extends Construct {
       account: props.account,
       vpc: props.vpc,
       selectedSubnets: props.selectedSubnets,
-      lambdaRole: this.intakeLambdaRole,
-      intakeContainer: this.intakeContainer,
       outputBucket: this.metadataStorage.outputBucket,
       stacTopic: this.ingestTopic, // Intake outputs to ingest topic
       inputTopic: this.inputTopic,
       securityGroup: this.securityGroup,
-      config: this.config
+      config: this.config,
+      stacApiUrl: this.stacApiGateway.apiUrl
     });
   }
 
@@ -706,10 +573,9 @@ export class Dataplane extends Construct {
       account: props.account,
       vpc: props.vpc,
       selectedSubnets: props.selectedSubnets,
-      lambdaRole: this.ingestLambdaRole,
-      ingestContainer: this.ingestContainer,
       osDomain: this.openSearchDomain.domain,
       ingestTopic: this.ingestTopic,
+      securityGroup: this.securityGroup,
       config: this.config
     });
   }
@@ -725,9 +591,8 @@ export class Dataplane extends Construct {
       account: props.account,
       vpc: props.vpc,
       selectedSubnets: props.selectedSubnets,
-      lambdaRole: this.stacLambdaRole,
-      stacContainer: this.stacContainer,
       osDomain: this.openSearchDomain.domain,
+      securityGroup: this.securityGroup,
       config: this.config
     });
   }

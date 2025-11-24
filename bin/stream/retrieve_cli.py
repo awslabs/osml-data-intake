@@ -187,12 +187,12 @@ class RetrieveCLI:
         return result
 
     @staticmethod
-    def _discover_stac_endpoint(region: str, export_name: str = "DC-StacApiUrl") -> Optional[str]:
+    def _discover_stac_endpoint(region: str, export_name: str = "DataCatalog-StacApiUrl") -> Optional[str]:
         """
         Discover the STAC endpoint from CloudFormation exports.
 
         :param region: The AWS region to search in.
-        :param export_name: The CloudFormation export name to look for (default: "DC-StacApiUrl").
+        :param export_name: The CloudFormation export name to look for (default: "DataCatalog-StacApiUrl").
         :returns: The STAC endpoint URL, or None if not found.
         """
         try:
@@ -268,8 +268,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--export-name",
         required=False,
-        default="DC-StacApiUrl",
-        help="CloudFormation export name to search for if --stac-endpoint is not provided (default: DC-StacApiUrl).",
+        default="DataCatalog-StacApiUrl",
+        help="CloudFormation export name to search for (default: DataCatalog-StacApiUrl).",
     )
 
     args = parser.parse_args()
