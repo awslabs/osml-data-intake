@@ -2,7 +2,7 @@
  * Copyright 2024-2025 Amazon.com, Inc. or its affiliates.
  */
 
-import { Duration, Size } from "aws-cdk-lib";
+import { Duration, RemovalPolicy, Size } from "aws-cdk-lib";
 import {
   ISecurityGroup,
   IVpc,
@@ -15,6 +15,7 @@ import {
   Function,
   LoggingFormat
 } from "aws-cdk-lib/aws-lambda";
+import { CfnLogGroup } from "aws-cdk-lib/aws-logs";
 import { Domain } from "aws-cdk-lib/aws-opensearchservice";
 import { Construct } from "constructs";
 
@@ -39,6 +40,8 @@ export interface StacFunctionProps {
   readonly securityGroup?: ISecurityGroup;
   /** The DC dataplane configuration. */
   readonly config: DataplaneConfig;
+  /** The removal policy for resources. */
+  readonly removalPolicy: RemovalPolicy;
 }
 
 /**
@@ -103,6 +106,15 @@ export class StacFunction extends Construct {
       loggingFormat: LoggingFormat.JSON
     });
     this.function.node.addDependency(this.container);
+
+    // Set removal policy on the automatically created log group
+    if (this.function.logGroup) {
+      const logGroupResource = this.function.logGroup.node
+        .defaultChild as CfnLogGroup;
+      if (logGroupResource) {
+        logGroupResource.applyRemovalPolicy(props.removalPolicy);
+      }
+    }
 
     // Allow the STAC Lambda to connect to OpenSearch
     props.osDomain.connections.allowFrom(this.function, Port.tcp(443));

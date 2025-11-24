@@ -2,7 +2,7 @@
  * Copyright 2024-2025 Amazon.com, Inc. or its affiliates.
  */
 
-import { Duration, Size } from "aws-cdk-lib";
+import { Duration, RemovalPolicy, Size } from "aws-cdk-lib";
 import { IVpc, SubnetSelection } from "aws-cdk-lib/aws-ec2";
 import { IRole, Role } from "aws-cdk-lib/aws-iam";
 import {
@@ -10,6 +10,7 @@ import {
   Function,
   LoggingFormat
 } from "aws-cdk-lib/aws-lambda";
+import { CfnLogGroup } from "aws-cdk-lib/aws-logs";
 import { Bucket } from "aws-cdk-lib/aws-s3";
 import { ITopic } from "aws-cdk-lib/aws-sns";
 import { LambdaSubscription } from "aws-cdk-lib/aws-sns-subscriptions";
@@ -42,6 +43,8 @@ export interface IntakeFunctionProps {
   readonly config: DataplaneConfig;
   /** The STAC API Gateway URL (optional). */
   readonly stacApiUrl?: string;
+  /** The removal policy for resources. */
+  readonly removalPolicy: RemovalPolicy;
 }
 
 /**
@@ -95,6 +98,15 @@ export class IntakeFunction extends Construct {
       loggingFormat: LoggingFormat.JSON
     });
     this.function.node.addDependency(this.container);
+
+    // Set removal policy on the automatically created log group
+    if (this.function.logGroup) {
+      const logGroupResource = this.function.logGroup.node
+        .defaultChild as CfnLogGroup;
+      if (logGroupResource) {
+        logGroupResource.applyRemovalPolicy(props.removalPolicy);
+      }
+    }
 
     // Subscribe Lambda function to the SNS topic
     props.inputTopic.addSubscription(new LambdaSubscription(this.function));

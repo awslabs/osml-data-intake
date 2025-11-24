@@ -69,6 +69,12 @@ export class DataCatalogStack extends Stack {
         id: "AwsSolutions-L1",
         reason:
           "Custom resource Lambda functions use a specific runtime version required by CDK. The runtime version is managed by the CDK framework and cannot be changed."
+      },
+      {
+        id: "AwsSolutions-IAM5",
+        reason:
+          "LogRetention Lambda functions created by CDK require wildcard permissions to manage log groups across the account. This is a standard CDK custom resource that manages log group retention policies and requires broad permissions to function correctly.",
+        appliesTo: ["Resource::*"]
       }
     ]);
   }

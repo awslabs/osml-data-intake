@@ -558,7 +558,8 @@ export class Dataplane extends Construct {
       inputTopic: this.inputTopic,
       securityGroup: this.securityGroup,
       config: this.config,
-      stacApiUrl: this.stacApiGateway.apiUrl
+      stacApiUrl: this.stacApiGateway.apiUrl,
+      removalPolicy: this.removalPolicy
     });
   }
 
@@ -576,7 +577,8 @@ export class Dataplane extends Construct {
       osDomain: this.openSearchDomain.domain,
       ingestTopic: this.ingestTopic,
       securityGroup: this.securityGroup,
-      config: this.config
+      config: this.config,
+      removalPolicy: this.removalPolicy
     });
   }
 
@@ -593,7 +595,8 @@ export class Dataplane extends Construct {
       selectedSubnets: props.selectedSubnets,
       osDomain: this.openSearchDomain.domain,
       securityGroup: this.securityGroup,
-      config: this.config
+      config: this.config,
+      removalPolicy: this.removalPolicy
     });
   }
 
