@@ -87,12 +87,12 @@ class StreamCLI:
         return message
 
     @staticmethod
-    def _discover_sns_topic_arn(region: str, topic_name: str = "osml-data-intake") -> Optional[str]:
+    def _discover_sns_topic_arn(region: str, topic_name: str = "data-catalog-intake") -> Optional[str]:
         """
         Discover the SNS topic ARN by topic name.
 
         :param region: The AWS region to search in.
-        :param topic_name: The name of the SNS topic to find (default: "osml-data-intake").
+        :param topic_name: The name of the SNS topic to find (default: "data-catalog-intake").
         :returns: The ARN of the SNS topic, or None if not found.
         """
         try:
@@ -137,8 +137,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--topic-name",
         required=False,
-        default="osml-data-intake",
-        help="SNS topic name to search for if --topic-arn is not provided (default: osml-data-intake).",
+        default="data-catalog-intake",
+        help="SNS topic name to search for if --topic-arn is not provided (default: data-catalog-intake).",
     )
 
     args = parser.parse_args()
