@@ -1,0 +1,168 @@
+/*
+ * Copyright 2024-2025 Amazon.com, Inc. or its affiliates.
+ */
+
+import { Duration, RemovalPolicy, Size } from "aws-cdk-lib";
+import {
+  ISecurityGroup,
+  IVpc,
+  Port,
+  SubnetSelection
+} from "aws-cdk-lib/aws-ec2";
+import { IRole, Role } from "aws-cdk-lib/aws-iam";
+import {
+  DockerImageFunction,
+  Function,
+  LoggingFormat
+} from "aws-cdk-lib/aws-lambda";
+import { CfnLogGroup } from "aws-cdk-lib/aws-logs";
+import { Domain } from "aws-cdk-lib/aws-opensearchservice";
+import { Construct } from "constructs";
+
+import { OSMLAccount } from "../types";
+import { Container, ContainerConfig } from "./container";
+import { DataplaneConfig } from "./dataplane";
+import { StacRole } from "./stac-role";
+
+/**
+ * Properties for creating the STAC Lambda function.
+ */
+export interface StacFunctionProps {
+  /** The OSML account configuration. */
+  readonly account: OSMLAccount;
+  /** The VPC configuration. */
+  readonly vpc: IVpc;
+  /** The selected subnets for the VPC. */
+  readonly selectedSubnets: SubnetSelection;
+  /** The OpenSearch domain. */
+  readonly osDomain: Domain;
+  /** The security group for the Lambda function (optional). */
+  readonly securityGroup?: ISecurityGroup;
+  /** The DC dataplane configuration. */
+  readonly config: DataplaneConfig;
+  /** The removal policy for resources. */
+  readonly removalPolicy: RemovalPolicy;
+}
+
+/**
+ * Construct that manages the STAC API Lambda function for the Data Catalog.
+ *
+ * This construct encapsulates the creation and configuration of the Lambda
+ * function for the STAC API.
+ */
+export class StacFunction extends Construct {
+  /** The Lambda function for the STAC API. */
+  public readonly function: Function;
+  /** The IAM role for the Lambda function. */
+  public readonly role: IRole;
+  /** The container for the Lambda function. */
+  public readonly container: Container;
+
+  /**
+   * Creates a new StacFunction construct.
+   *
+   * @param scope - The scope/stack in which to define this construct
+   * @param id - The id of this construct within the current scope
+   * @param props - The properties for configuring this construct
+   */
+  constructor(scope: Construct, id: string, props: StacFunctionProps) {
+    super(scope, id);
+
+    // Initialize the Lambda role
+    this.role = this.initializeRole(props);
+
+    // Create the STAC container
+    this.container = this.createContainer(props);
+
+    // Create an operating ENV for our lambda container
+    const env = {
+      STAC_FASTAPI_TITLE: props.config.STAC_FASTAPI_TITLE,
+      STAC_FASTAPI_DESCRIPTION: props.config.STAC_FASTAPI_DESCRIPTION,
+      STAC_FASTAPI_VERSION: props.config.STAC_FASTAPI_VERSION,
+      RELOAD: props.config.STAC_RELOAD,
+      ENVIRONMENT: props.config.STAC_ENVIRONMENT,
+      WEB_CONCURRENCY: props.config.STAC_WEB_CONCURRENCY,
+      ES_HOST: props.osDomain.domainEndpoint,
+      ES_PORT: props.config.STAC_ES_PORT,
+      ES_USE_SSL: props.config.STAC_ES_USE_SSL,
+      ES_VERIFY_CERTS: props.config.STAC_ES_VERIFY_CERTS,
+      STAC_FASTAPI_ROOT_PATH: `/${props.config.STAC_FASTAPI_ROOT_PATH}`
+    };
+
+    // Create the STAC API Lambda function
+    this.function = new DockerImageFunction(this, "DataCatalogStacFunction", {
+      functionName: "data-catalog-stac",
+      code: this.container.dockerImageCode,
+      role: this.role,
+      vpc: props.vpc,
+      vpcSubnets: props.selectedSubnets,
+      timeout: Duration.seconds(props.config.STAC_LAMBDA_TIMEOUT),
+      ephemeralStorageSize: Size.gibibytes(
+        props.config.STAC_LAMBDA_STORAGE_SIZE
+      ),
+      memorySize: props.config.STAC_LAMBDA_MEMORY_SIZE,
+      environment: env,
+      securityGroups: props.securityGroup ? [props.securityGroup] : [],
+      loggingFormat: LoggingFormat.JSON
+    });
+    this.function.node.addDependency(this.container);
+
+    // Set removal policy on the automatically created log group
+    if (this.function.logGroup) {
+      const logGroupResource = this.function.logGroup.node
+        .defaultChild as CfnLogGroup;
+      if (logGroupResource) {
+        logGroupResource.applyRemovalPolicy(props.removalPolicy);
+      }
+    }
+
+    // Allow the STAC Lambda to connect to OpenSearch
+    props.osDomain.connections.allowFrom(this.function, Port.tcp(443));
+  }
+
+  /**
+   * Initializes the STAC Lambda role.
+   *
+   * @param props - The StacFunction properties
+   * @returns The STAC Lambda role
+   */
+  private initializeRole(props: StacFunctionProps): IRole {
+    if (
+      props.config.STAC_LAMBDA_ROLE_NAME &&
+      props.config.STAC_LAMBDA_ROLE_NAME !== undefined &&
+      props.config.STAC_LAMBDA_ROLE_NAME !== ""
+    ) {
+      return Role.fromRoleName(
+        this,
+        "ImportedSTACFunctionRole",
+        props.config.STAC_LAMBDA_ROLE_NAME,
+        { mutable: false }
+      );
+    }
+    return new StacRole(this, "STACFunctionRole", {
+      account: props.account,
+      roleName: "STACFunctionRole",
+      openSearchDomainArn: props.osDomain.domainArn
+    }).role;
+  }
+
+  /**
+   * Creates the STAC container.
+   *
+   * @param props - The StacFunction properties
+   * @returns The STAC container
+   */
+  private createContainer(props: StacFunctionProps): Container {
+    return new Container(this, "STACContainer", {
+      account: props.account,
+      buildDockerImageCode: true,
+      buildFromSource: props.config.BUILD_FROM_SOURCE,
+      config: new ContainerConfig({
+        CONTAINER_URI: props.config.STAC_CONTAINER_URI,
+        CONTAINER_BUILD_PATH: props.config.CONTAINER_BUILD_PATH,
+        CONTAINER_BUILD_TARGET: props.config.STAC_CONTAINER_BUILD_TARGET,
+        CONTAINER_DOCKERFILE: props.config.STAC_CONTAINER_DOCKERFILE
+      })
+    });
+  }
+}

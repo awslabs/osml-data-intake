@@ -1,4 +1,4 @@
-#  Copyright 2024 Amazon.com, Inc. or its affiliates.
+#  Copyright 2024-2025 Amazon.com, Inc. or its affiliates.
 
 import argparse
 import json
@@ -86,6 +86,32 @@ class StreamCLI:
             message["tile_server_url"] = tile_server_url
         return message
 
+    @staticmethod
+    def _discover_sns_topic_arn(region: str, topic_name: str = "data-catalog-intake") -> Optional[str]:
+        """
+        Discover the SNS topic ARN by topic name.
+
+        :param region: The AWS region to search in.
+        :param topic_name: The name of the SNS topic to find (default: "data-catalog-intake").
+        :returns: The ARN of the SNS topic, or None if not found.
+        """
+        try:
+            sns_client = boto3.client("sns", region_name=region)
+            paginator = sns_client.get_paginator("list_topics")
+
+            for page in paginator.paginate():
+                for topic in page.get("Topics", []):
+                    topic_arn = topic["TopicArn"]
+                    # Extract topic name from ARN (format: arn:aws:sns:region:account:name)
+                    arn_parts = topic_arn.split(":")
+                    if len(arn_parts) >= 6 and arn_parts[5] == topic_name:
+                        return topic_arn
+
+            return None
+        except Exception as e:
+            print(f"Error discovering SNS topic: {e}")
+            return None
+
     def run(self) -> None:
         """
         Executes the main publishing and logging retrieval process.
@@ -97,12 +123,36 @@ class StreamCLI:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Publish an S3 URI to an SNS topic and collect Lambda logs.")
     parser.add_argument("--s3-uri", required=True, help="S3 URI to publish as the SNS message.")
-    parser.add_argument("--topic-arn", required=True, help="SNS topic ARN to publish to.")
+    parser.add_argument(
+        "--topic-arn",
+        required=False,
+        help="SNS topic ARN to publish to. If not provided, will attempt to auto-discover from account.",
+    )
     parser.add_argument("--item-id", required=True, help="The ID for the item.")
     parser.add_argument("--collection-id", required=False, help="The collection to place the item in.")
     parser.add_argument("--tile-server-url", required=False, help="The base url to the Tile Server")
+    parser.add_argument(
+        "--region", required=False, default="us-west-2", help="AWS region to use for auto-discovery (default: us-west-2)."
+    )
+    parser.add_argument(
+        "--topic-name",
+        required=False,
+        default="data-catalog-intake",
+        help="SNS topic name to search for if --topic-arn is not provided (default: data-catalog-intake).",
+    )
 
     args = parser.parse_args()
 
-    sns_logger = StreamCLI(args.s3_uri, args.topic_arn, args.item_id, args.collection_id, args.tile_server_url)
+    # Auto-discover topic ARN if not provided
+    topic_arn = args.topic_arn
+    if not topic_arn:
+        print(f"Auto-discovering SNS topic ARN for topic name '{args.topic_name}' in region '{args.region}'...")
+        topic_arn = StreamCLI._discover_sns_topic_arn(args.region, args.topic_name)
+        if not topic_arn:
+            print(f"Error: Could not find SNS topic '{args.topic_name}' in region '{args.region}'.")
+            print("Please provide --topic-arn or ensure the topic exists in your account.")
+            exit(1)
+        print(f"Found SNS topic ARN: {topic_arn}")
+
+    sns_logger = StreamCLI(args.s3_uri, topic_arn, args.item_id, args.collection_id, args.tile_server_url)
     sns_logger.run()
