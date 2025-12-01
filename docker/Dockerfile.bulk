@@ -50,7 +50,7 @@ COPY . osml-data-intake
 # Install the data intake application
 RUN . /opt/conda/etc/profile.d/conda.sh && \
     conda activate ${CONDA_TARGET_ENV} && \
-    python3 -m pip install --no-cache-dir osml-data-intake/.
+    python3 -m pip install --no-cache-dir --root-user-action=ignore osml-data-intake/.
 
 # Stage 2: Runtime environment
 FROM public.ecr.aws/amazonlinux/amazonlinux:2023-minimal as osml_data_intake_bulk

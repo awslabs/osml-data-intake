@@ -16,6 +16,7 @@ from aws.osml.photogrammetry.sensor_model import SensorModel
 
 from .managers import S3Manager, S3Url, SNSManager, SNSRequest
 from .processor_base import ProcessorBase
+from .stac_validator import StacValidationError, validate_stac_item
 from .utils import AsyncContextFilter, logger
 
 os.environ["PROJ_LIB"] = "/opt/conda/envs/osml_data_intake/share/proj"
@@ -79,7 +80,8 @@ class ImageData:
         coordinates = []
         for corner in self.image_corners:
             world_coordinate = self.sensor_model.image_to_world(ImageCoordinate(corner))
-            coordinates.append((degrees(world_coordinate.longitude), degrees(world_coordinate.latitude)))
+            # Convert to list (not tuple) for STAC/GeoJSON compliance
+            coordinates.append([degrees(world_coordinate.longitude), degrees(world_coordinate.latitude)])
         coordinates.append(coordinates[0])
         self.geo_polygon = [coordinates]
 
@@ -184,14 +186,13 @@ class ImageData:
 
         return info_file
 
-    def generate_stac_item(self, s3_manager: S3Manager, request: SNSRequest, ovr_file, stac_catalog: str = ".") -> Item:
+    def generate_stac_item(self, s3_manager: S3Manager, request: SNSRequest, ovr_file: Optional[str]) -> Item:
         """
         Create and publish a STAC item using the configured SNS manager.
 
         :param: s3_manager: The s3 manager handling the source file.
         :param: request: The SNSRequest used to derive a STAC Item
         :param: ovr_file: The overview file created by GDAL, but may not always be present for small images.
-        :param: stac_catalog: The catalog the item is intended for.
         :returns: The generated STAC item.
         :raises ClientError: If publishing to SNS fails.
         """
@@ -236,29 +237,40 @@ class ImageData:
                 "type": "application/octet-stream",
                 "roles": ["data"],
             }
-        return Item(
-            **{
-                "id": request.item_id,
-                "collection": request.collection_id,
-                "type": "Feature",
-                "geometry": {"type": "Polygon", "coordinates": self.geo_polygon},
-                "bbox": self.geo_bbox,
-                "properties": {
-                    "datetime": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-                    "description": f"STAC Item for image {s3_manager.s3_url.url}",
-                },
-                "assets": assets,
-                "links": [
-                    {"href": f"{stac_catalog}/collections/{request.collection_id}/items/{request.item_id}", "rel": "self"},
-                    {
-                        "href": f"{stac_catalog}/collections/{request.collection_id}",
-                        "rel": "collection",
-                        "type": "application/json",
-                    },
-                ],
-                "stac_version": "1.0.0",
-            }
-        )
+
+        # Use relative paths for links - the STAC API server will resolve these
+        # relative to the API base URL when serving items
+        self_href = f"/collections/{request.collection_id}/items/{request.item_id}"
+        collection_href = f"/collections/{request.collection_id}"
+
+        logger.info(f"Generated STAC item links - self: {self_href}, collection: {collection_href}")
+
+        # Ensure links are properly formatted
+        links = [
+            {"href": self_href, "rel": "self"},
+            {
+                "href": collection_href,
+                "rel": "collection",
+                "type": "application/json",
+            },
+        ]
+
+        item_data = {
+            "id": request.item_id,
+            "collection": request.collection_id,
+            "type": "Feature",
+            "geometry": {"type": "Polygon", "coordinates": self.geo_polygon},
+            "bbox": self.geo_bbox,
+            "properties": {
+                "datetime": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+                "description": f"STAC Item for image {s3_manager.s3_url.url}",
+            },
+            "assets": assets,
+            "links": links,
+            "stac_version": "1.0.0",
+        }
+
+        return Item(**item_data)
 
     def clean_dataset(self) -> None:
         """
@@ -331,9 +343,23 @@ class ImageProcessor(ProcessorBase):
             if ovr_file:
                 self.s3_manager.upload_file(ovr_file, "OVR", {"ContentType": "image/tiff"})
 
-            # Generate and publish the STAC item to the SNS topic
+            # Generate and validate the STAC item
             stac_item = image_data.generate_stac_item(self.s3_manager, self.sns_request, ovr_file)
-            self.sns_manager.publish_message(json.dumps(stac_item))
+
+            # Validate the STAC item before publishing
+            try:
+                validate_stac_item(stac_item)
+                logger.info("STAC item validation passed")
+            except StacValidationError as validation_err:
+                logger.error(f"STAC item validation failed: {validation_err}")
+                return self.failure_message(f"Invalid STAC item: {validation_err}")
+
+            # Convert Item TypedDict to dict for JSON serialization
+            # validate_stac_item already handles this conversion, so we can safely convert here
+            stac_item_dict = dict(stac_item) if hasattr(stac_item, "keys") and not isinstance(stac_item, dict) else stac_item
+
+            logger.info(f"Publishing STAC item with {len(stac_item_dict.get('links', []))} links")
+            self.sns_manager.publish_message(json.dumps(stac_item_dict))
 
             # Clean up the GDAL dataset
             image_data.clean_dataset()

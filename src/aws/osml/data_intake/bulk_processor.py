@@ -1,4 +1,4 @@
-#  Copyright 2024 Amazon.com, Inc. or its affiliates.
+#  Copyright 2024-2025 Amazon.com, Inc. or its affiliates.
 
 import asyncio
 import json
@@ -18,6 +18,7 @@ from stac_fastapi.types.stac import Collection, Item
 
 from aws.osml.data_intake.image_processor import ImageData
 from aws.osml.data_intake.managers.s3_manager import S3Manager, S3Url
+from aws.osml.data_intake.managers.sns_manager import SNSRequest
 from aws.osml.data_intake.utils import AsyncContextFilter, BotoConfig, ServiceConfig, get_minimal_collection_dict, logger
 
 
@@ -50,7 +51,7 @@ class BulkProcessor:
         self.database = DatabaseLogic()
         self.failed_manifest_path = os.path.join(self.output_path, "failed_images_manifest.json")
 
-    def generate_upload_files(self, image: str, image_id: str) -> Tuple[ImageData, S3Manager]:
+    def generate_upload_files(self, image: str, image_id: str) -> Tuple[ImageData, S3Manager, Optional[str]]:
         """
         Generate required files for the given image, upload generated files, and then delete
         the files once uploaded.
@@ -58,7 +59,7 @@ class BulkProcessor:
         :param image: Path or S3 URL of the image.
         :param image_id: ID of the image.
 
-        :return Tuple containing ImageData and S3Manager instance.
+        :return Tuple containing ImageData, S3Manager instance, and ovr_file path (if generated, else None).
         """
 
         AsyncContextFilter.set_context({"item_id": image_id})
@@ -76,17 +77,21 @@ class BulkProcessor:
         s3_manager.upload_file(aux_file, ".AUX")
 
         ovr_file = image_data.generate_ovr_file()
-        s3_manager.upload_file(ovr_file, ".OVR")
+        if ovr_file:
+            s3_manager.upload_file(ovr_file, ".OVR")
 
         # list files in the directory
         listDir = os.listdir(s3_manager.tmp_dir)
         logger.info(f"Files in the directory (generateFiles): {listDir}")
 
         # Delete files then clean up dataset to preserve storage space
-        image_data.delete_files([local_object_path, aux_file, ovr_file])
+        files_to_delete = [local_object_path, aux_file]
+        if ovr_file:
+            files_to_delete.append(ovr_file)
+        image_data.delete_files(files_to_delete)
         image_data.clean_dataset()
 
-        return image_data, s3_manager
+        return image_data, s3_manager, ovr_file
 
     def record_failed_image(self, error_details: dict) -> None:
         """
@@ -116,9 +121,13 @@ class BulkProcessor:
         async with semaphore:
             try:
                 image_id = token_hex(16)
-                image_data, s3_manager = self.generate_upload_files(image, image_id)
+                image_data, s3_manager, ovr_file = self.generate_upload_files(image, image_id)
                 logger.info(f"Creating STAC item with ID {image_id}")
-                stac_item = image_data.generate_stac_item(s3_manager, image_id, self.collection_id, self.stac_endpoint)
+                # Create SNSRequest object for generate_stac_item
+                request = SNSRequest(image_uri=image, item_id=image_id, collection_id=self.collection_id)
+                # ovr_file is generated and uploaded in generate_upload_files, but then deleted
+                # Pass the path if it was generated (for asset inclusion), even though file is deleted
+                stac_item = image_data.generate_stac_item(s3_manager, request, ovr_file)
                 return stac_item
             except Exception as error:
                 error_details = {"image": image, "error": str(error), "internal_traceback": traceback.format_exc()}

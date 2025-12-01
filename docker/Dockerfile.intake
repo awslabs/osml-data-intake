@@ -79,17 +79,14 @@ RUN conda clean -afy
 # Copy the function code to the LAMBDA_TASK_ROOT directory
 ADD . ${LAMBDA_TASK_ROOT}
 
-# Install the lambda manager into the conda python
-RUN python3.13 -m pip install --no-cache-dir awslambdaric
-
 # Set environment variables for better compilation
 ENV CC=gcc
 ENV CXX=g++
 ENV LDFLAGS="-L/usr/lib64"
 ENV CPPFLAGS="-I/usr/include"
 
-# Install the package into the base image
-RUN python3.13 -m pip install --no-cache-dir --verbose .
+# Install the package into the conda environment
+RUN /opt/conda/envs/${CONDA_ENV_NAME}/bin/pip install --no-cache-dir --root-user-action=ignore --verbose .
 
 # Set entry point
 CMD ["aws.osml.data_intake.image_processor.handler"]
