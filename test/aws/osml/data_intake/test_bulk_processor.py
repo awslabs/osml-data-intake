@@ -1,4 +1,4 @@
-# Copyright 2024 Amazon.com, Inc. or its affiliates.
+# Copyright 2024-2025 Amazon.com, Inc. or its affiliates.
 
 import json
 import os
@@ -62,10 +62,12 @@ class TestBulkProcessor(unittest.TestCase):
 
         mock_item_id = "mock_id"
 
-        image_data, s3_manager = self.bulk_processor.generate_upload_files(self.test_image, mock_item_id)
+        image_data, s3_manager, ovr_file = self.bulk_processor.generate_upload_files(self.test_image, mock_item_id)
 
         self.assertEqual(image_data.width, 3376)
         self.assertEqual(image_data.height, 2576)
+
+        self.assertIsInstance(ovr_file, str)
 
         s3_url = S3Url(self.test_image)
         self.assertEqual(s3_manager.s3_url.bucket, s3_url.bucket)
