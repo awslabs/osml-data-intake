@@ -90,4 +90,15 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
     # Log the event payload to see the raw SNS message
     message = event["Records"][0]["Sns"]["Message"]
-    return asyncio.run(IngestProcessor(message).process())
+    processor = IngestProcessor(message)
+
+    async def process_with_cleanup():
+        """Process the message and ensure database client is closed."""
+        try:
+            return await processor.process()
+        finally:
+            # Ensure the database client is properly closed to avoid unclosed session warnings
+            if hasattr(processor.database, "client") and processor.database.client:
+                await processor.database.client.close()
+
+    return asyncio.run(process_with_cleanup())

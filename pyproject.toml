@@ -14,9 +14,12 @@ src_paths = ["src", "test", "bin"]
 
 [tool.pytest.ini_options]
 minversion = "6.0"
-addopts = "-ra -q"
+addopts = "-ra -q -m \"not integration\""
 testpaths = [
     "test"
+]
+markers = [
+    "integration: marks tests as integration tests (deselect with '-m \"not integration\"')"
 ]
 
 [tool.autopep8]

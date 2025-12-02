@@ -121,6 +121,44 @@ After setting up your environment, you can verify your setup by sending a test m
 
    **Note:** The retrieve CLI uses Lambda invocation to access the STAC catalog. By default, it uses the `data-catalog-stac` Lambda function in `us-west-2`. You can customize this with `--lambda-function-name` and `--lambda-region` if needed.
 
+## Running Integration Tests
+
+The integration test is a Lambda function that performs an end-to-end smoke test of the data catalog pipeline. It:
+
+1. Uploads a test image to S3
+2. Publishes to the intake SNS topic
+3. Waits for processing
+4. Retrieves the item from the STAC catalog
+5. Validates it was added correctly
+
+**Prerequisites:**
+
+* Ensure that your AWS credentials are configured properly in the environment
+* Deploy the integration test stack by setting `"deployIntegrationTests": true` in your `cdk/bin/deployment/deployment.json`
+* Deploy the CDK stacks including the integration test stack
+
+**Run the Integration Test:**
+
+1. Run the integration test using pytest:
+
+   ```bash
+   pytest test/integ/test_integration.py
+   ```
+
+2. By default, it invokes the `data-catalog-integration-test` Lambda function in `us-west-2`. You can configure the Lambda function name and region via environment variables:
+
+   ```bash
+   INTEG_TEST_LAMBDA_FUNCTION_NAME=<FUNCTION_NAME> INTEG_TEST_LAMBDA_REGION=<REGION> pytest test/integ/test_integration.py
+   ```
+
+3. The test will output the results, including:
+   * Success/failure status
+   * Test item ID
+   * Elapsed time
+   * Any errors encountered
+
+**Note:** The integration test Lambda function must be deployed and configured with the appropriate environment variables (INPUT_BUCKET, INPUT_TOPIC_ARN, STAC_FUNCTION_NAME, etc.) which are automatically set by the CDK stack.
+
 ## Submitting a Bulk Ingest Job
 
 This workflow is tailored for efficiently processing large quantities of images stored in an S3 bucket and integrating them into a STAC catalog using AWS services. It is designed to streamline the ingestion process for thousands of images awaiting cataloging.

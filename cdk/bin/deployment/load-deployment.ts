@@ -28,10 +28,10 @@
  *     "ECS_TASK_CPU": 2048,
  *     "ECS_TASK_MEMORY": 4096
  *   },
- *   "deployTestModels": true,  // Optional: whether to deploy test models stack
- *   "testModelsConfig": {
- *     "BUILD_FROM_SOURCE": true,  // Optional: build containers from source instead of pulling from Docker Hub
- *     "CONTAINER_URI": "awsosml/osml-models:latest"  // Optional: container image to use
+ *   "deployIntegrationTests": true,  // Optional: whether to deploy integration test stack
+ *   "integrationTestConfig": {
+ *     "BUILD_FROM_SOURCE": false,  // Optional: build containers from source instead of pulling from Docker Hub
+ *     "CONTAINER_URI": "awsosml/osml-data-intake-integration-test:latest"  // Optional: container image to use
  *   }
  * }
  * ```
@@ -67,6 +67,12 @@ export interface DeploymentConfig {
 
   /** Optional Dataplane configuration. Can be a partial config object passed to DataplaneConfig constructor. */
   dataplaneConfig?: Partial<Record<string, unknown>>;
+
+  /** Optional flag to enable deployment of the integration test stack. Defaults to false if not specified. */
+  deployIntegrationTests?: boolean;
+
+  /** Optional Integration Test configuration. Can be a partial config object passed to IntegrationTestConfig constructor. */
+  integrationTestConfig?: Partial<Record<string, unknown>>;
 }
 
 /**
@@ -354,6 +360,26 @@ export function loadDeploymentConfig(): DeploymentConfig {
     dataplaneConfig = parsedObj.dataplaneConfig as Record<string, unknown>;
   }
 
+  // Parse optional Integration Test configuration
+  let integrationTestConfig: DeploymentConfig["integrationTestConfig"] =
+    undefined;
+  if (
+    parsedObj.integrationTestConfig &&
+    typeof parsedObj.integrationTestConfig === "object" &&
+    parsedObj.integrationTestConfig !== null
+  ) {
+    integrationTestConfig = parsedObj.integrationTestConfig as Record<
+      string,
+      unknown
+    >;
+  }
+
+  // Parse optional deployIntegrationTests flag
+  const deployIntegrationTests =
+    parsedObj.deployIntegrationTests !== undefined
+      ? (parsedObj.deployIntegrationTests as boolean)
+      : undefined;
+
   const validatedConfig: DeploymentConfig = {
     projectName,
     account: {
@@ -363,7 +389,9 @@ export function loadDeploymentConfig(): DeploymentConfig {
       isAdc: (accountObj.isAdc as boolean | undefined) ?? false
     },
     networkConfig,
-    dataplaneConfig: dataplaneConfig
+    dataplaneConfig: dataplaneConfig,
+    deployIntegrationTests: deployIntegrationTests,
+    integrationTestConfig: integrationTestConfig
   };
 
   // Only log non-sensitive configuration details (prevent duplicate logging)
