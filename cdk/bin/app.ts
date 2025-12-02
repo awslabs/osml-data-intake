@@ -16,6 +16,7 @@ import { App } from "aws-cdk-lib";
 import { IVpc, Vpc } from "aws-cdk-lib/aws-ec2";
 
 import { DataCatalogStack } from "../lib/data-catalog-stack";
+import { IntegrationTestStack } from "../lib/integration-test-stack";
 import { NetworkStack } from "../lib/network-stack";
 import { loadDeploymentConfig } from "./deployment/load-deployment";
 
@@ -78,3 +79,25 @@ const dataCatalogStack = new DataCatalogStack(
   }
 );
 dataCatalogStack.node.addDependency(networkStack);
+
+// -----------------------------------------------------------------------------
+// Deploy the IntegrationTestStack (if enabled)
+// -----------------------------------------------------------------------------
+
+if (deployment.deployIntegrationTests) {
+  const integrationTestStack = new IntegrationTestStack(
+    app,
+    `${deployment.projectName}-IntegrationTest`,
+    {
+      env: {
+        account: deployment.account.id,
+        region: deployment.account.region
+      },
+      deployment: deployment,
+      vpc: networkStack.network.vpc,
+      selectedSubnets: networkStack.network.selectedSubnets,
+      dataplane: dataCatalogStack.resources
+    }
+  );
+  integrationTestStack.node.addDependency(dataCatalogStack);
+}
