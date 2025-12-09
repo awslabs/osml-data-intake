@@ -1,0 +1,55 @@
+name: Run Integration Tests
+
+permissions:
+  id-token: write
+  contents: read
+
+on:
+  workflow_call:
+    inputs:
+      aws_region:
+        required: true
+        type: string
+    secrets:
+      DATA_INTAKE_ACCOUNT_ID:
+        required: true
+
+env:
+  AWS_REGION: ${{ inputs.aws_region }}
+  AWS_PAGER: ""
+  PYTHON_VERSION: '3.13'
+
+jobs:
+  run-integration-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup AWS OIDC
+        uses: ./.github/actions/setup-aws-oidc
+        with:
+          aws_region: ${{ inputs.aws_region }}
+          account_id: ${{ secrets.DATA_INTAKE_ACCOUNT_ID }}
+          role_duration_seconds: '7200'
+      - name: Setup Python
+        uses: ./.github/actions/setup-python
+        with:
+          python_version: ${{ env.PYTHON_VERSION }}
+          cache_dependency_paths: 'test/integ/requirements.txt'
+      - name: Install test dependencies
+        run: |
+          pip install -r test/integ/requirements.txt
+      - name: Run integration tests
+        env:
+          INTEG_TEST_LAMBDA_REGION: ${{ inputs.aws_region }}
+        run: pytest test/integ/test_integration.py -s -v -m integration
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-results
+          path: |
+            test-results.xml
+            pytest-report.html
+          if-no-files-found: ignore

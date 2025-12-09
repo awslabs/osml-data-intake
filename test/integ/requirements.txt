@@ -1,0 +1,13 @@
+#  Copyright 2024-2025 Amazon.com, Inc. or its affiliates.
+#
+# Requirements for OSML Data Intake Integration Tests
+#
+# These are the minimal dependencies needed to run the integration test framework.
+# The integration tests run independently of the main data intake package.
+
+# AWS SDK
+boto3>=1.40.70
+botocore>=1.40.70
+
+# Testing framework
+pytest>=8.0.0
