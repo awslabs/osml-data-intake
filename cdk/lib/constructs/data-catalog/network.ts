@@ -23,7 +23,7 @@ import { BaseConfig, ConfigType, RegionalConfig } from "../types";
 export class NetworkConfig extends BaseConfig {
   /**
    * The name to assign the creation of the VPC.
-   * @default "model-runner-vpc"
+   * @default "data-intake-vpc"
    */
   public VPC_NAME?: string;
 
@@ -49,7 +49,7 @@ export class NetworkConfig extends BaseConfig {
 
   /**
    * The name to assign the creation of the creation of the security group.
-   * @default "model-runner-security-group"
+   * @default "data-intake-security-group"
    */
   public SECURITY_GROUP_NAME?: string;
 
@@ -60,15 +60,15 @@ export class NetworkConfig extends BaseConfig {
   constructor(config: ConfigType = {}) {
     super({
       // Set default values here
-      VPC_NAME: "model-runner-vpc",
-      SECURITY_GROUP_NAME: "model-runner-security-group",
+      VPC_NAME: "data-intake-vpc",
+      SECURITY_GROUP_NAME: "data-intake-security-group",
       ...config
     });
   }
 }
 
 /**
- * Properties for creating a model runner VPC.
+ * Properties for creating a data intake VPC.
  */
 export interface NetworkProps {
   /** The OSML account configuration. */
@@ -85,7 +85,7 @@ export interface NetworkProps {
  * When creating a new VPC, it includes:
  * - Public subnets with Internet Gateway
  * - Private subnets with NAT Gateway
- * - Security group with allowAllOutbound enabled for Model Runner Docker image access
+ * - Security group with allowAllOutbound enabled for Data Intake Docker image access
  *
  * When importing an existing VPC, it can also import an existing security group
  * by providing the SECURITY_GROUP_ID in the configuration.
@@ -230,11 +230,11 @@ export class Network extends Construct {
         this.config.SECURITY_GROUP_ID
       );
     } else {
-      // Create new security group to allow outbound access for Model Runner to pull images from Docker Hub
+      // Create new security group to allow outbound access for Data Intake to pull images from Docker Hub
       return new SecurityGroup(this, "SecurityGroup", {
         securityGroupName: this.config.SECURITY_GROUP_NAME,
         vpc: this.vpc,
-        description: "Security group for Model Runner with outbound access",
+        description: "Security group for Data Intake with outbound access",
         allowAllOutbound: true
       });
     }

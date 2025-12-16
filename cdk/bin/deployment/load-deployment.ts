@@ -24,7 +24,7 @@
  *     "securityGroupId": "sg-1234567890abcdef0"  // Optional: security group for test endpoints
  *   },
  *   "dataplaneConfig": {
- *     "CONTAINER_URI": "awsosml/osml-model-runner:latest",
+ *     "CONTAINER_URI": "awsosml/osml-data-intake:latest",
  *     "ECS_TASK_CPU": 2048,
  *     "ECS_TASK_MEMORY": 4096
  *   },
