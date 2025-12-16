@@ -10,7 +10,7 @@ import {
   Function,
   LoggingFormat
 } from "aws-cdk-lib/aws-lambda";
-import { CfnLogGroup } from "aws-cdk-lib/aws-logs";
+import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
 import { Bucket } from "aws-cdk-lib/aws-s3";
 import { ITopic } from "aws-cdk-lib/aws-sns";
 import { LambdaSubscription } from "aws-cdk-lib/aws-sns-subscriptions";
@@ -75,6 +75,15 @@ export class IntakeFunction extends Construct {
     // Create the intake container
     this.container = this.createContainer(props);
 
+    // Create the log group explicitly with removal policy to ensure cleanup on stack destroy
+    const logGroup = new LogGroup(this, "DataCatalogIntakeFunctionLogGroup", {
+      logGroupName: "/aws/lambda/data-catalog-intake",
+      retention: props.account.prodLike
+        ? RetentionDays.ONE_YEAR
+        : RetentionDays.ONE_WEEK,
+      removalPolicy: props.removalPolicy
+    });
+
     // Create the intake Lambda function
     this.function = new DockerImageFunction(this, "DataCatalogIntakeFunction", {
       functionName: "data-catalog-intake",
@@ -92,18 +101,10 @@ export class IntakeFunction extends Construct {
         OUTPUT_TOPIC: props.stacTopic.topicArn
       },
       securityGroups: props.securityGroup ? [props.securityGroup] : [],
-      loggingFormat: LoggingFormat.JSON
+      loggingFormat: LoggingFormat.JSON,
+      logGroup: logGroup
     });
     this.function.node.addDependency(this.container);
-
-    // Set removal policy on the automatically created log group
-    if (this.function.logGroup) {
-      const logGroupResource = this.function.logGroup.node
-        .defaultChild as CfnLogGroup;
-      if (logGroupResource) {
-        logGroupResource.applyRemovalPolicy(props.removalPolicy);
-      }
-    }
 
     // Subscribe Lambda function to the SNS topic
     props.inputTopic.addSubscription(new LambdaSubscription(this.function));
