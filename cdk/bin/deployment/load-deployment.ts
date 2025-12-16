@@ -397,7 +397,7 @@ export function loadDeploymentConfig(): DeploymentConfig {
   // Only log non-sensitive configuration details (prevent duplicate logging)
   if (!hasLoggedDeploymentConfig) {
     console.log(
-      `🚀 Using environment from deployment.json: projectName=${validatedConfig.projectName}, region=${validatedConfig.account.region}`
+      `Using environment from deployment.json: projectName=${validatedConfig.projectName}, region=${validatedConfig.account.region}`
     );
     hasLoggedDeploymentConfig = true;
   }

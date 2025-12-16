@@ -13,7 +13,6 @@
  */
 
 import { App } from "aws-cdk-lib";
-import { IVpc, Vpc } from "aws-cdk-lib/aws-ec2";
 
 import { DataCatalogStack } from "../lib/data-catalog-stack";
 import { IntegrationTestStack } from "../lib/integration-test-stack";
@@ -33,18 +32,6 @@ const app = new App();
 const deployment = loadDeploymentConfig();
 
 // -----------------------------------------------------------------------------
-// Create VPC (only if importing existing VPC)
-// -----------------------------------------------------------------------------
-
-let vpc: IVpc | undefined;
-if (deployment.networkConfig?.VPC_ID) {
-  // Import existing VPC
-  vpc = Vpc.fromLookup(app, "SharedVPC", {
-    vpcId: deployment.networkConfig.VPC_ID
-  });
-}
-
-// -----------------------------------------------------------------------------
 // Deploy the network stack.
 // -----------------------------------------------------------------------------
 
@@ -56,8 +43,7 @@ const networkStack = new NetworkStack(
       account: deployment.account.id,
       region: deployment.account.region
     },
-    deployment: deployment,
-    vpc: vpc
+    deployment: deployment
   }
 );
 
@@ -67,7 +53,7 @@ const networkStack = new NetworkStack(
 
 const dataCatalogStack = new DataCatalogStack(
   app,
-  `${deployment.projectName}-DataCatalog`,
+  `${deployment.projectName}-Dataplane`,
   {
     env: {
       account: deployment.account.id,

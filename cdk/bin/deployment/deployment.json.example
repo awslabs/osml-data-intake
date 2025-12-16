@@ -1,5 +1,5 @@
 {
-  "projectName": "OSML",
+  "projectName": "OSML-DataCatalog",
   "account": {
     "id": "123456789012",
     "region": "us-west-2",
@@ -11,6 +11,10 @@
     "targetSubnets": ["subnet-12345", "subnet-67890"]
   },
   "dataplaneConfig": {
+    "BUILD_FROM_SOURCE": true
+  },
+  "deployIntegrationTests": true,
+  "integrationTestConfig": {
     "BUILD_FROM_SOURCE": true
   }
 }
