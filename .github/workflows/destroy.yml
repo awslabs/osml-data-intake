@@ -42,7 +42,6 @@ jobs:
         with:
           account_id: ${{ secrets.DATA_INTAKE_ACCOUNT_ID }}
           aws_region: ${{ inputs.aws_region }}
-          build_from_source: 'false'
       - name: Build CDK
         working-directory: cdk
         run: npm run build

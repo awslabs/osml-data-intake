@@ -48,7 +48,6 @@ jobs:
         with:
           account_id: ${{ secrets.DATA_INTAKE_ACCOUNT_ID }}
           aws_region: ${{ inputs.aws_region }}
-          build_from_source: ${{ inputs.build_from_source }}
       - name: Build and synthesize CDK
         working-directory: cdk
         run: |
