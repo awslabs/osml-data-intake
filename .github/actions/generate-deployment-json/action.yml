@@ -7,10 +7,6 @@ inputs:
   aws_region:
     description: 'AWS region'
     required: true
-  build_from_source:
-    description: 'Whether to build from source'
-    required: false
-    default: 'true'
 runs:
   using: composite
   steps:
@@ -20,7 +16,6 @@ runs:
       env:
         ACCOUNT_ID: ${{ inputs.account_id }}
         AWS_REGION: ${{ inputs.aws_region }}
-        BUILD_FROM_SOURCE: ${{ inputs.build_from_source }}
       run: |
         python3 << 'EOF'
         import json
@@ -29,22 +24,6 @@ runs:
             config = json.load(f)
         config['account']['id'] = os.environ['ACCOUNT_ID']
         config['account']['region'] = os.environ['AWS_REGION']
-        config['account']['prodLike'] = False
-        build_from_source = os.environ.get('BUILD_FROM_SOURCE', 'true').lower() == 'true'
-        if 'networkConfig' in config:
-            del config['networkConfig']
-        if 'dataplaneConfig' in config:
-            config['dataplaneConfig']['BUILD_FROM_SOURCE'] = build_from_source
-        # Enable integration test stack deployment for CI/CD workflows
-        config['deployIntegrationTests'] = True
-        # Set BUILD_FROM_SOURCE for integration test config if it exists
-        if 'integrationTestConfig' in config:
-            if not isinstance(config['integrationTestConfig'], dict):
-                config['integrationTestConfig'] = {}
-            config['integrationTestConfig']['BUILD_FROM_SOURCE'] = build_from_source
-        elif build_from_source:
-            # Create integrationTestConfig if it doesn't exist and we need to build from source
-            config['integrationTestConfig'] = {'BUILD_FROM_SOURCE': build_from_source}
         with open('bin/deployment/deployment.json', 'w') as f:
             json.dump(config, f, indent=2)
         EOF
