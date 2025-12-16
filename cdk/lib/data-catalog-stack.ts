@@ -33,7 +33,7 @@ export class DataCatalogStack extends Stack {
    */
   constructor(parent: App, name: string, props: DataCatalogStackProps) {
     super(parent, name, {
-      terminationProtection: props.deployment.account.prodLike,
+      terminationProtection: props.deployment.account.prodLike || false,
       ...props
     });
 

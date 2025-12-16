@@ -41,7 +41,7 @@ export class IntegrationTestStack extends Stack {
    */
   constructor(parent: App, name: string, props: IntegrationTestStackProps) {
     super(parent, name, {
-      terminationProtection: props.deployment.account.prodLike,
+      terminationProtection: props.deployment.account.prodLike || false,
       ...props
     });
 
@@ -51,13 +51,12 @@ export class IntegrationTestStack extends Stack {
       : new IntegrationTestConfig();
 
     // Create the input bucket for test images
+    const prodLike = props.deployment.account.prodLike || false;
     this.inputBucket = new Bucket(this, "InputBucket", {
       bucketName: `${props.deployment.account.id}-data-catalog-test-bucket`,
       encryption: BucketEncryption.S3_MANAGED,
-      removalPolicy: props.deployment.account.prodLike
-        ? RemovalPolicy.RETAIN
-        : RemovalPolicy.DESTROY,
-      autoDeleteObjects: !props.deployment.account.prodLike
+      removalPolicy: prodLike ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
+      autoDeleteObjects: !prodLike
     });
 
     // Create the integration test Lambda function
@@ -73,9 +72,7 @@ export class IntegrationTestStack extends Stack {
         stacFunction: props.dataplane.stacFunction.function,
         securityGroup: props.dataplane.securityGroup,
         config: integrationTestConfig,
-        removalPolicy: props.deployment.account.prodLike
-          ? RemovalPolicy.RETAIN
-          : RemovalPolicy.DESTROY
+        removalPolicy: prodLike ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY
       }
     );
   }

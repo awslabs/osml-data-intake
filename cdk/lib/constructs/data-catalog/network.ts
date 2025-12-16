@@ -195,12 +195,14 @@ export class Network extends Construct {
       // Add VPC Flow Logs for compliance (required by AwsSolutions-VPC7)
       const flowLogGroup = new LogGroup(this, "VPCFlowLogGroup", {
         logGroupName: `/aws/vpc/flowlogs/${this.config.VPC_NAME}`,
-        retention: props.account.prodLike
-          ? RetentionDays.ONE_YEAR
-          : RetentionDays.ONE_WEEK,
-        removalPolicy: props.account.prodLike
-          ? RemovalPolicy.RETAIN
-          : RemovalPolicy.DESTROY
+        retention:
+          props.account.prodLike || false
+            ? RetentionDays.ONE_YEAR
+            : RetentionDays.ONE_WEEK,
+        removalPolicy:
+          props.account.prodLike || false
+            ? RemovalPolicy.RETAIN
+            : RemovalPolicy.DESTROY
       });
 
       vpc.addFlowLog("VPCFlowLog", {

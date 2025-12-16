@@ -417,7 +417,7 @@ export class Dataplane extends Construct {
    * @returns The removal policy
    */
   private initializeRemovalPolicy(props: DataplaneProps): RemovalPolicy {
-    return props.account.prodLike
+    return props.account.prodLike || false
       ? RemovalPolicy.RETAIN
       : RemovalPolicy.DESTROY;
   }
