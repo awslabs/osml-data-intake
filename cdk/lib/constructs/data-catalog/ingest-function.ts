@@ -15,7 +15,7 @@ import {
   Function,
   LoggingFormat
 } from "aws-cdk-lib/aws-lambda";
-import { CfnLogGroup } from "aws-cdk-lib/aws-logs";
+import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
 import { Domain } from "aws-cdk-lib/aws-opensearchservice";
 import { ITopic } from "aws-cdk-lib/aws-sns";
 import { LambdaSubscription } from "aws-cdk-lib/aws-sns-subscriptions";
@@ -93,6 +93,13 @@ export class IngestFunction extends Construct {
       STAC_FASTAPI_ROOT_PATH: `/${props.config.STAC_FASTAPI_ROOT_PATH}`
     };
 
+    // Create the lambda log group
+    const logGroup = new LogGroup(this, "IngestFunctionLogGroup", {
+      logGroupName: "/aws/lambda/data-catalog-ingest",
+      retention: RetentionDays.ONE_WEEK,
+      removalPolicy: RemovalPolicy.DESTROY
+    });
+
     // Create the ingest Lambda function
     this.function = new DockerImageFunction(this, "DataCatalogIngestFunction", {
       functionName: "data-catalog-ingest",
@@ -107,18 +114,10 @@ export class IngestFunction extends Construct {
       memorySize: props.config.INGEST_LAMBDA_MEMORY_SIZE,
       environment: env,
       securityGroups: props.securityGroup ? [props.securityGroup] : [],
-      loggingFormat: LoggingFormat.JSON
+      loggingFormat: LoggingFormat.JSON,
+      logGroup: logGroup
     });
     this.function.node.addDependency(this.container);
-
-    // Set removal policy on the automatically created log group
-    if (this.function.logGroup) {
-      const logGroupResource = this.function.logGroup.node
-        .defaultChild as CfnLogGroup;
-      if (logGroupResource) {
-        logGroupResource.applyRemovalPolicy(props.removalPolicy);
-      }
-    }
 
     // Subscribe Lambda function to the SNS topic
     props.ingestTopic.addSubscription(new LambdaSubscription(this.function));
