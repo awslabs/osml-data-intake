@@ -267,4 +267,4 @@ See [CONTRIBUTING](https://github.com/aws-solutions-library-samples/osml-data-in
 
 ## License
 
-MIT No Attribution Licensed. See [LICENSE](https://github.com/aws-solutions-library-samples/osml-data-intake/LICENSE).
+This library is licensed under the Apache 2.0 License. See [LICENSE](https://github.com/aws-solutions-library-samples/osml-data-intake/LICENSE).

@@ -4,7 +4,7 @@ This CDK project deploys the core infrastructure for **OSML Data Intake** and **
 
 ---
 
-## 📋 Prerequisites
+## Prerequisites
 
 Before deploying, ensure the following tools and resources are available:
 
@@ -16,7 +16,7 @@ Before deploying, ensure the following tools and resources are available:
 
 ---
 
-## ⚙️ Configuration
+## Configuration
 
 ### Deployment File: `bin/deployment/deployment.json`
 
@@ -45,7 +45,7 @@ Update the contents:
 }
 ```
 
-💡 This file is validated at runtime to ensure all required fields are provided. Deployment will fail if any required fields are missing or invalid.
+Note: This file is validated at runtime to ensure all required fields are provided. Deployment will fail if any required fields are missing or invalid.
 
 ### VPC Configuration
 
@@ -164,7 +164,7 @@ By default, the CDK uses the pre-built container image from the registry. To bui
 
 ---
 
-## 🚀 Deployment Instructions
+## Deployment Instructions
 
 ### 1. Install Dependencies
 
@@ -214,7 +214,7 @@ This command will:
 
 ---
 
-## 🧱 Project Structure
+## Project Structure
 
 ```text
 cdk
@@ -251,7 +251,7 @@ cdk
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 This CDK project uses a **modular construct architecture** that separates concerns into focused, reusable classes:
 
@@ -303,7 +303,7 @@ const opensearch = dataCatalogDataplane.openSearchDomain;
 
 ---
 
-## 🧪 Development & Testing
+## Development & Testing
 
 ### Useful Commands
 
@@ -321,7 +321,7 @@ const opensearch = dataCatalogDataplane.openSearchDomain;
 
 ---
 
-## 🔐 Security & Best Practices
+## Security & Best Practices
 
 This project integrates **cdk-nag** to validate infrastructure against AWS security best practices. Running `npm run test` will:
 
@@ -329,7 +329,7 @@ This project integrates **cdk-nag** to validate infrastructure against AWS secur
 - Ensure encryption is enabled where applicable
 - Warn about missing logging or compliance settings
 
-📄 **Review the cdk-nag report** to maintain compliance and security posture before production deployments.
+**Review the cdk-nag report** to maintain compliance and security posture before production deployments.
 
 ### CDK-NAG Report Generation
 
@@ -388,7 +388,7 @@ For deeper hardening guidance, refer to:
 
 ---
 
-## 🧠 Summary
+## Summary
 
 This CDK project provides infrastructure-as-code for deploying data intake and catalog capabilities using AWS native services. It includes security validations via cdk-nag and supports deployment across multiple environments through configuration files.
 
