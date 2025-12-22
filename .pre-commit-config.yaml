@@ -53,6 +53,7 @@ repos:
             .+\.md|
             test/data/.*|
             LICENSE|
+            NOTICE|
             tox.ini|
             pyproject.toml|
             setup.cfg|
@@ -83,6 +84,7 @@ repos:
             .+\.md|
             test/data/.*|
             LICENSE|
+            NOTICE|
             tox.ini|
             pyproject.toml|
             setup.cfg|
