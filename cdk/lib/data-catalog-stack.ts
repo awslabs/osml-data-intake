@@ -1,8 +1,8 @@
 /*
- * Copyright 2024-2025 Amazon.com, Inc. or its affiliates.
+ * Copyright 2024-2026 Amazon.com, Inc. or its affiliates.
  */
 
-import { App, Environment, Stack, StackProps } from "aws-cdk-lib";
+import { App, CfnOutput, Environment, Stack, StackProps } from "aws-cdk-lib";
 import { IVpc, SubnetSelection } from "aws-cdk-lib/aws-ec2";
 import { NagSuppressions } from "cdk-nag";
 
@@ -52,6 +52,13 @@ export class DataCatalogStack extends Stack {
       vpc: this.vpc,
       selectedSubnets: props.selectedSubnets,
       config: dataplaneConfig
+    });
+
+    // Add CloudFormation output for the STAC Lambda ARN
+    new CfnOutput(this, "StacLambdaArn", {
+      value: this.resources.stacFunction.function.functionArn,
+      description: "ARN of the STAC API Lambda function",
+      exportName: `${this.deployment.projectName}-StacLambdaArn`
     });
 
     // Add cdk-nag suppressions for custom resources created by OpenSearch domain
