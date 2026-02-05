@@ -1,10 +1,12 @@
-#  Copyright 2024 Amazon.com, Inc. or its affiliates.
+#  Copyright 2024-2026 Amazon.com, Inc. or its affiliates.
 
 import json
+import os
 import traceback
 from abc import ABC, abstractmethod
 from typing import Any, Dict
 
+from .managers import S3Manager, SNSManager, SNSRequest
 from .utils import logger
 
 
@@ -12,6 +14,17 @@ class ProcessorBase(ABC):
     """
     A base class providing common success and failure message handling for processors.
     """
+
+    def __init__(self, message: str) -> None:
+        """
+        Initialize shared processor dependencies.
+
+        :param message: The incoming SNS request message.
+        :returns: None
+        """
+        self.s3_manager = S3Manager(os.getenv("OUTPUT_BUCKET", None))
+        self.sns_manager = SNSManager(os.getenv("OUTPUT_TOPIC", None))
+        self.sns_request = SNSRequest(**json.loads(message))
 
     @staticmethod
     def success_message(message: str) -> Dict[str, Any]:

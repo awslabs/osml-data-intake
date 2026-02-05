@@ -1,5 +1,5 @@
 /*
- * Copyright 2024-2025 Amazon.com, Inc. or its affiliates.
+ * Copyright 2024-2026 Amazon.com, Inc. or its affiliates.
  */
 
 import { RemovalPolicy } from "aws-cdk-lib";
@@ -78,6 +78,12 @@ export class DataplaneConfig extends BaseConfig {
    * @default 900
    */
   public INTAKE_LAMBDA_TIMEOUT: number;
+
+  /**
+   * Whether to deconstruct GeoJSON FeatureCollections into multiple items.
+   * @default "false"
+   */
+  public DECONSTRUCT_FEATURE_COLLECTIONS: string;
 
   /**
    * The name to give the output bucket.
@@ -276,6 +282,7 @@ export class DataplaneConfig extends BaseConfig {
       INTAKE_LAMBDA_MEMORY_SIZE: 1024,
       INTAKE_LAMBDA_STORAGE_SIZE: 10,
       INTAKE_LAMBDA_TIMEOUT: 900,
+      DECONSTRUCT_FEATURE_COLLECTIONS: "false",
       INGEST_LAMBDA_MEMORY_SIZE: 4096,
       INGEST_LAMBDA_STORAGE_SIZE: 10,
       INGEST_LAMBDA_TIMEOUT: 300,

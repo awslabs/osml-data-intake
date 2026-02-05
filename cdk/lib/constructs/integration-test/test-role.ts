@@ -1,5 +1,5 @@
 /*
- * Copyright 2024-2025 Amazon.com, Inc. or its affiliates.
+ * Copyright 2024-2026 Amazon.com, Inc. or its affiliates.
  */
 
 import { region_info } from "aws-cdk-lib";
@@ -122,7 +122,12 @@ export class IntegrationTestRole extends Construct {
     policy.addStatements(
       new PolicyStatement({
         effect: Effect.ALLOW,
-        actions: ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
+        actions: [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:PutObjectTagging",
+          "s3:DeleteObject"
+        ],
         resources: [`${props.inputBucketArn}/*`]
       })
     );

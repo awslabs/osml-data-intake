@@ -1,5 +1,5 @@
 /*
- * Copyright 2023-2025 Amazon.com, Inc. or its affiliates.
+ * Copyright 2023-2026 Amazon.com, Inc. or its affiliates.
  */
 
 import { region_info } from "aws-cdk-lib";
@@ -112,6 +112,7 @@ export class IntakeRole extends Construct {
           "s3:ListBucket",
           "s3:GetBucketLocation",
           "s3:GetObject",
+          "s3:GetObjectTagging",
           "s3:GetObjectAcl",
           "s3:PutObject",
           "s3:DeleteObject"

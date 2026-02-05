@@ -1,5 +1,5 @@
 /*
- * Copyright 2024-2025 Amazon.com, Inc. or its affiliates.
+ * Copyright 2024-2026 Amazon.com, Inc. or its affiliates.
  */
 
 import { Duration, RemovalPolicy, Size } from "aws-cdk-lib";
@@ -96,7 +96,9 @@ export class IntakeFunction extends Construct {
       memorySize: props.config.INTAKE_LAMBDA_MEMORY_SIZE,
       environment: {
         OUTPUT_BUCKET: props.outputBucket.bucketName,
-        OUTPUT_TOPIC: props.stacTopic.topicArn
+        OUTPUT_TOPIC: props.stacTopic.topicArn,
+        DECONSTRUCT_FEATURE_COLLECTIONS:
+          props.config.DECONSTRUCT_FEATURE_COLLECTIONS || "false"
       },
       securityGroups: props.securityGroup ? [props.securityGroup] : [],
       loggingFormat: LoggingFormat.JSON,
