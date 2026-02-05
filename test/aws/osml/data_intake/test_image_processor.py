@@ -1,174 +1,128 @@
-#  Copyright 2024 Amazon.com, Inc. or its affiliates.
+#  Copyright 2024-2026 Amazon.com, Inc. or its affiliates.
 
 import json
 import os
 import shutil
-import unittest
 
 import boto3
+import pytest
 from moto import mock_aws
 
 
-@mock_aws
-class TestImageProcessor(unittest.TestCase):
-    """
-    A test suite for the ImageProcessor class.
-
-    This suite runs tests to ensure that the ImageProcessor can handle both
-    successful and unsuccessful image processing tasks.
-    """
-
-    def setUp(self):
-        """
-        Set up the test environment for ImageProcessor tests.
-
-        This involves creating a test S3 bucket, uploading a test image file,
-        creating an SNS topic, and initializing the ImageProcessor with
-        a mock S3 image URL and mock AWS clients.
-        """
-        from aws.osml.data_intake.image_processor import ImageProcessor
-
-        # Retrieve environment variables or set default values
+@pytest.fixture
+def mock_image_env():
+    with mock_aws():
         test_bucket = "test-bucket"
         test_topic = "test-topic"
 
-        # Create S3 bucket and upload test image
         s3 = boto3.resource("s3", region_name="us-east-1")
         s3.meta.client.create_bucket(Bucket=test_bucket)
         s3.meta.client.upload_file("./test/data/small.tif", test_bucket, "small.tif")
 
-        # Create an SNS topic
         sns = boto3.client("sns", region_name="us-east-1")
         response = sns.create_topic(Name=test_topic)
         sns_topic_arn = response["TopicArn"]
 
-        # Mock the ImageProcessor
-        self.message = {"image_uri": f"s3://{test_bucket}/small.tif", "item_id": "test_id"}
-        self.processor = ImageProcessor(message=json.dumps(self.message))
-        self.processor.sns_manager.sns_client = sns
-        self.processor.sns_manager.output_topic = sns_topic_arn
-        self.processor.s3_manager.s3_client = s3
-        self.processor.s3_manager.output_bucket = test_bucket
-        self.processor.s3_manager = self.processor.s3_manager
-
-    def test_process_success(self):
-        """
-        Test the process method of ImageProcessor for a successful scenario.
-        """
-        # Run the process method
-        response = self.processor.process()
-
-        # Check the response
-        self.assertEqual(response["statusCode"], 200)
-        self.assertIn("successfully", response["body"])
-
-    def test_process_failure(self):
-        """
-        Test the process method of ImageProcessor for a failure scenario.
-        """
-        self.processor.sns_request.image_uri = "s3://invalid-bucket/invalid-image.tif"
-
-        # Run the process method
-        response = self.processor.process()
-
-        # Check the response
-        self.assertEqual(response["statusCode"], 500)
-        self.assertIn("Unable to Load", response["body"])
-
-
-class TestImageData(unittest.TestCase):
-    """
-    A test suite for the ImageData class in the AWS OSML data intake module.
-
-    This suite tests the instantiation and properties of the ImageData class to ensure
-    that it properly handles image files and associated metadata.
-    """
-
-    def setUp(self):
-        """
-        Set up the test environment for testing ImageData.
-        """
-        from aws.osml.data_intake.image_processor import ImageData
-
-        self.original_source = "./test/data/small.tif"
-        self.source_file = "./test/data/small-test.tif"
-        shutil.copyfile(self.original_source, self.source_file)
-        self.image_data = ImageData(self.source_file)
-        self.original_files = {
-            "aux": f"{self.original_source}.aux.xml",
-            "ovr": f"{self.original_source}.ovr",
-            "gdalinfo": f"{self.original_source}.gdalinfo.json",
+        yield {
+            "s3": s3,
+            "sns": sns,
+            "sns_topic_arn": sns_topic_arn,
+            "test_bucket": test_bucket,
         }
 
-    def test_generate_metadata(self):
-        """
-        Test the generate_metadata method of ImageData.
-        """
-        self.image_data.generate_metadata()
-        self.assertIsNotNone(self.image_data.dataset)
-        self.assertIsNotNone(self.image_data.sensor_model)
-        self.assertEqual(self.image_data.width, self.image_data.dataset.RasterXSize)
-        self.assertEqual(self.image_data.height, self.image_data.dataset.RasterYSize)
-        self.assertEqual(
-            self.image_data.image_corners,
-            [
-                [0, 0],
-                [self.image_data.width, 0],
-                [self.image_data.width, self.image_data.height],
-                [0, self.image_data.height],
-            ],
-        )
 
-    def test_create_image_data(self):
-        """
-        Test the creation and initialization of ImageData.
-        """
-        self.assertIsNotNone(self.image_data.geo_polygon)
-        self.assertIsNotNone(self.image_data.geo_bbox)
+@pytest.fixture
+def image_processor(mock_image_env):
+    from aws.osml.data_intake.image_processor import ImageProcessor
 
-    def test_generate_aux_file(self):
-        """
-        Test the generate_aux_file method of ImageData.
-        """
-        aux_file = self.image_data.generate_aux_file()
-        self.assertEqual(aux_file, self.source_file + ".aux.xml")
-        self.assertTrue(os.path.exists(aux_file))
-
-    def test_generate_ovr_file(self):
-        """
-        Test the generate_ovr_file method of ImageData.
-        """
-        ovr_file = self.image_data.generate_ovr_file()
-        self.assertEqual(ovr_file, self.source_file + ".ovr")
-        self.assertTrue(os.path.exists(ovr_file))
-
-    def test_generate_gdalinfo(self):
-        """
-        Test the generate_gdalinfo method of ImageData.
-        """
-        info_file = self.image_data.generate_gdalinfo()
-        self.assertEqual(info_file, self.source_file + ".gdalinfo.json")
-        self.assertTrue(os.path.exists(info_file))
-
-    def test_clean_dataset(self):
-        """
-        Test the clean_dataset method of ImageData.
-        """
-        self.image_data.clean_dataset()
-        self.assertIsNone(self.image_data.dataset)
-
-    def tearDown(self):
-        """
-        Clean up any files generated during testing.
-        """
-        files_to_remove = [
-            self.source_file,
-            self.source_file + ".aux.xml",
-            self.source_file + ".ovr",
-            self.source_file + ".gdalinfo.json",
-        ]
-        self.image_data.delete_files(files_to_remove)
+    message = {"image_uri": f"s3://{mock_image_env['test_bucket']}/small.tif", "item_id": "test_id"}
+    processor = ImageProcessor(message=json.dumps(message))
+    processor.sns_manager.sns_client = mock_image_env["sns"]
+    processor.sns_manager.output_topic = mock_image_env["sns_topic_arn"]
+    processor.s3_manager.s3_client = mock_image_env["s3"]
+    processor.s3_manager.output_bucket = mock_image_env["test_bucket"]
+    return processor
 
 
-if __name__ == "__main__":
-    unittest.main()
+def test_process_success(image_processor):
+    response = image_processor.process()
+
+    assert response["statusCode"] == 200
+    assert "successfully" in response["body"]
+
+
+def test_process_failure(image_processor):
+    image_processor.sns_request.image_uri = "s3://invalid-bucket/invalid-image.tif"
+    response = image_processor.process()
+
+    assert response["statusCode"] == 500
+    assert "Unable to Load" in response["body"]
+
+
+@pytest.fixture
+def image_data(tmp_path):
+    from aws.osml.data_intake.image_processor import ImageData
+
+    original_source = "./test/data/small.tif"
+    source_file = tmp_path / "small-test.tif"
+    shutil.copyfile(original_source, source_file)
+    image_data_instance = ImageData(str(source_file))
+
+    yield image_data_instance, str(source_file)
+
+    files_to_remove = [
+        str(source_file),
+        f"{source_file}.aux.xml",
+        f"{source_file}.ovr",
+        f"{source_file}.gdalinfo.json",
+    ]
+    image_data_instance.delete_files(files_to_remove)
+
+
+def test_generate_metadata(image_data):
+    image_data_instance, _ = image_data
+    image_data_instance.generate_metadata()
+
+    assert image_data_instance.dataset is not None
+    assert image_data_instance.sensor_model is not None
+    assert image_data_instance.width == image_data_instance.dataset.RasterXSize
+    assert image_data_instance.height == image_data_instance.dataset.RasterYSize
+    assert image_data_instance.image_corners == [
+        [0, 0],
+        [image_data_instance.width, 0],
+        [image_data_instance.width, image_data_instance.height],
+        [0, image_data_instance.height],
+    ]
+
+
+def test_create_image_data(image_data):
+    image_data_instance, _ = image_data
+    assert image_data_instance.geo_polygon is not None
+    assert image_data_instance.geo_bbox is not None
+
+
+def test_generate_aux_file(image_data):
+    image_data_instance, source_file = image_data
+    aux_file = image_data_instance.generate_aux_file()
+    assert aux_file == f"{source_file}.aux.xml"
+    assert os.path.exists(aux_file)
+
+
+def test_generate_ovr_file(image_data):
+    image_data_instance, source_file = image_data
+    ovr_file = image_data_instance.generate_ovr_file()
+    assert ovr_file == f"{source_file}.ovr"
+    assert os.path.exists(ovr_file)
+
+
+def test_generate_gdalinfo(image_data):
+    image_data_instance, source_file = image_data
+    info_file = image_data_instance.generate_gdalinfo()
+    assert info_file == f"{source_file}.gdalinfo.json"
+    assert os.path.exists(info_file)
+
+
+def test_clean_dataset(image_data):
+    image_data_instance, _ = image_data
+    image_data_instance.clean_dataset()
+    assert image_data_instance.dataset is None

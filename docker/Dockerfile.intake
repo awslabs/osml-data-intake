@@ -1,4 +1,4 @@
-# Copyright 2024-2025 Amazon.com, Inc. or its affiliates.
+# Copyright 2024-2026 Amazon.com, Inc. or its affiliates.
 
 FROM public.ecr.aws/lambda/python:3.13 AS build
 
@@ -88,5 +88,5 @@ ENV CPPFLAGS="-I/usr/include"
 # Install the package into the conda environment
 RUN /opt/conda/envs/${CONDA_ENV_NAME}/bin/pip install --no-cache-dir --root-user-action=ignore --verbose .
 
-# Set entry point
-CMD ["aws.osml.data_intake.image_processor.handler"]
+# Set entry point - unified handler routes to appropriate processor based on file type
+CMD ["aws.osml.data_intake.intake_handler.handler"]

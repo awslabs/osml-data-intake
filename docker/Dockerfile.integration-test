@@ -1,4 +1,4 @@
-# Copyright 2024-2025 Amazon.com, Inc. or its affiliates.
+# Copyright 2024-2026 Amazon.com, Inc. or its affiliates.
 
 FROM public.ecr.aws/lambda/python:3.13 AS integration-test
 
@@ -19,6 +19,7 @@ RUN pip3 install --no-cache-dir --root-user-action=ignore .
 # Copy test data to the container
 RUN mkdir -p /opt/test/data
 COPY test/data/small.tif /opt/test/data/small.tif
+COPY test/data/feature_collection.geojson /opt/test/data/feature_collection.geojson
 
 # Set entry point
 CMD ["test.integ.handler.handler"]

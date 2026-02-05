@@ -1,9 +1,8 @@
-#  Copyright 2024-2025 Amazon.com, Inc. or its affiliates.
+#  Copyright 2024-2026 Amazon.com, Inc. or its affiliates.
 
 import json
 import os
 import time
-from datetime import datetime, timezone
 from math import ceil, degrees, log
 from typing import Any, Dict, List, Optional
 
@@ -14,8 +13,9 @@ from aws.osml.gdal.gdal_utils import load_gdal_dataset
 from aws.osml.photogrammetry.coordinates import ImageCoordinate
 from aws.osml.photogrammetry.sensor_model import SensorModel
 
-from .managers import S3Manager, S3Url, SNSManager, SNSRequest
+from .managers import S3Manager, S3Url, SNSRequest
 from .processor_base import ProcessorBase
+from .stac_utils import build_stac_item, calculate_bbox_from_coords, get_current_datetime_iso, stac_item_to_dict
 from .stac_validator import StacValidationError, validate_stac_item
 from .utils import AsyncContextFilter, logger
 
@@ -104,12 +104,7 @@ class ImageData:
             ]]
         """
         coords = self.geo_polygon[0]
-        min_lon = min(coord[0] for coord in coords)
-        min_lat = min(coord[1] for coord in coords)
-        max_lon = max(coord[0] for coord in coords)
-        max_lat = max(coord[1] for coord in coords)
-
-        self.geo_bbox = [min_lon, min_lat, max_lon, max_lat]
+        self.geo_bbox = calculate_bbox_from_coords(coords)
 
     def generate_ovr_file(self, preview_size: int = 1024) -> Optional[str]:
         """
@@ -139,7 +134,7 @@ class ImageData:
 
         if overviews:
             if new_full_path:
-                new_dataset, new_sensor_model = load_gdal_dataset(new_full_path)
+                new_dataset, _ = load_gdal_dataset(new_full_path)
                 ovr_file = new_full_path + self.overview_ext
                 new_dataset.BuildOverviews("AVERAGE", overviews)
                 # Clean up
@@ -188,13 +183,12 @@ class ImageData:
 
     def generate_stac_item(self, s3_manager: S3Manager, request: SNSRequest, ovr_file: Optional[str]) -> Item:
         """
-        Create and publish a STAC item using the configured SNS manager.
+        Create a STAC item for the processed image.
 
-        :param: s3_manager: The s3 manager handling the source file.
-        :param: request: The SNSRequest used to derive a STAC Item
-        :param: ovr_file: The overview file created by GDAL, but may not always be present for small images.
+        :param s3_manager: The S3 manager handling the source file.
+        :param request: The SNSRequest used to derive a STAC Item.
+        :param ovr_file: The overview file created by GDAL (may be ``None`` for small images).
         :returns: The generated STAC item.
-        :raises ClientError: If publishing to SNS fails.
         """
         logger.info("Creating STAC item.")
         key = s3_manager.s3_url.key
@@ -238,39 +232,19 @@ class ImageData:
                 "roles": ["data"],
             }
 
-        # Use relative paths for links - the STAC API server will resolve these
-        # relative to the API base URL when serving items
-        self_href = f"/collections/{request.collection_id}/items/{request.item_id}"
-        collection_href = f"/collections/{request.collection_id}"
-
-        logger.info(f"Generated STAC item links - self: {self_href}, collection: {collection_href}")
-
-        # Ensure links are properly formatted
-        links = [
-            {"href": self_href, "rel": "self"},
-            {
-                "href": collection_href,
-                "rel": "collection",
-                "type": "application/json",
-            },
-        ]
-
-        item_data = {
-            "id": request.item_id,
-            "collection": request.collection_id,
-            "type": "Feature",
-            "geometry": {"type": "Polygon", "coordinates": self.geo_polygon},
-            "bbox": self.geo_bbox,
-            "properties": {
-                "datetime": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-                "description": f"STAC Item for image {s3_manager.s3_url.url}",
-            },
-            "assets": assets,
-            "links": links,
-            "stac_version": "1.0.0",
+        properties = {
+            "datetime": get_current_datetime_iso(),
+            "description": f"STAC Item for image {s3_manager.s3_url.url}",
         }
 
-        return Item(**item_data)
+        return build_stac_item(
+            item_id=request.item_id,
+            collection_id=request.collection_id,
+            geometry={"type": "Polygon", "coordinates": self.geo_polygon},
+            bbox=self.geo_bbox,
+            properties=properties,
+            assets=assets,
+        )
 
     def clean_dataset(self) -> None:
         """
@@ -297,7 +271,13 @@ class ImageProcessor(ProcessorBase):
     """
     Manages the entire image processing workflow in a serverless environment.
 
-    :param message: The incoming SNS request message.
+    This processor handles satellite imagery files (TIFF, NITF, JP2, etc.) by:
+    - Downloading the image from S3
+    - Extracting metadata using GDAL
+    - Generating auxiliary files (.aux.xml, .gdalinfo.json, .ovr)
+    - Creating and publishing STAC items
+
+    :param message: The incoming SNS request message (JSON string).
     """
 
     def __init__(self, message: str) -> None:
@@ -307,9 +287,7 @@ class ImageProcessor(ProcessorBase):
         :param message: The incoming SNS request message.
         :returns: None
         """
-        self.s3_manager = S3Manager(os.getenv("OUTPUT_BUCKET", None))
-        self.sns_manager = SNSManager(os.getenv("OUTPUT_TOPIC", None))
-        self.sns_request = SNSRequest(**json.loads(message))
+        super().__init__(message)
 
     def process(self) -> Dict[str, Any]:
         """
@@ -352,11 +330,9 @@ class ImageProcessor(ProcessorBase):
                 logger.info("STAC item validation passed")
             except StacValidationError as validation_err:
                 logger.error(f"STAC item validation failed: {validation_err}")
-                return self.failure_message(f"Invalid STAC item: {validation_err}")
+                return self.failure_message(validation_err)
 
-            # Convert Item TypedDict to dict for JSON serialization
-            # validate_stac_item already handles this conversion, so we can safely convert here
-            stac_item_dict = dict(stac_item) if hasattr(stac_item, "keys") and not isinstance(stac_item, dict) else stac_item
+            stac_item_dict = stac_item_to_dict(stac_item)
 
             logger.info(f"Publishing STAC item with {len(stac_item_dict.get('links', []))} links")
             self.sns_manager.publish_message(json.dumps(stac_item_dict))
@@ -365,21 +341,8 @@ class ImageProcessor(ProcessorBase):
             image_data.clean_dataset()
 
             # Return a response indicating success
-            return self.success_message("Message processed successfully")
+            return self.success_message("Image processed successfully")
 
         except Exception as err:
             # Return a response indicating failure
             return self.failure_message(err)
-
-
-def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
-    """
-    The AWS Lambda handler function to process an event.
-
-    :param event: The event payload contains the SNS message.
-    :param context: The Lambda execution context (unused).
-    :return: The response from the ImageProcessor process.
-    """
-    # Log the event payload to see the raw SNS message
-    message = event["Records"][0]["Sns"]["Message"]
-    return ImageProcessor(message).process()

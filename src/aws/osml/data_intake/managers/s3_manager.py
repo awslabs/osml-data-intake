@@ -1,9 +1,9 @@
-#  Copyright 2023-2025 Amazon.com, Inc. or its affiliates.
+#  Copyright 2023-2026 Amazon.com, Inc. or its affiliates.
 
 import os
 import shutil
 import traceback
-from typing import Optional
+from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
 import boto3
@@ -172,6 +172,17 @@ class S3Manager:
             logger.info(f"Uploaded {file_type} file to {self.output_bucket}/{key}")
         except ClientError as err:
             logger.error(f"Failed to upload {file_type} file: {err}")
+
+    def get_object_tagging(self, bucket: str, key: str) -> List[Dict[str, Any]]:
+        """
+        Retrieve the tag set for an S3 object.
+
+        :param bucket: The S3 bucket name.
+        :param key: The S3 object key.
+        :returns: List of tag dictionaries with ``Key`` and ``Value`` entries.
+        """
+        response = self.s3_client.meta.client.get_object_tagging(Bucket=bucket, Key=key)
+        return response.get("TagSet", [])
 
     @staticmethod
     def strip(file_path: str) -> str:
