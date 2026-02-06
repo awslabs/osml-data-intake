@@ -1,12 +1,10 @@
-#  Copyright 2024 Amazon.com, Inc. or its affiliates.
+#  Copyright 2024-2026 Amazon.com, Inc. or its affiliates.
 
-import unittest
+from aws.osml.data_intake.utils.app_config import get_minimal_collection_dict
 
 
-class TestLambdaLogger(unittest.TestCase):
+class TestAppConfig:
     def test_minimal_collection(self):
-        from aws.osml.data_intake.utils.app_config import get_minimal_collection_dict
-
         mock_collection_id = "test-collection"
         expected_minimal_collection = {
             "type": "Collection",
