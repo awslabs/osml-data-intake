@@ -1,50 +1,37 @@
-#  Copyright 2024-2025 Amazon.com, Inc. or its affiliates.
+#  Copyright 2024-2026 Amazon.com, Inc. or its affiliates.
 
 import logging
-import unittest
 from unittest.mock import patch
 
+from aws.osml.data_intake.utils.logger import _LOG_CONTEXT, AsyncContextFilter, configure_logger, get_logger
 
-class TestLambdaLogger(unittest.TestCase):
-    @patch("logging.Logger.hasHandlers", return_value=False)
-    @patch("logging.basicConfig")
-    def test_logger_no_handlers(self, mock_basic_config, mock_has_handlers):
+
+class TestLogger:
+    def test_logger_no_handlers(self):
         """
         Test that basicConfig is called if no handlers are present on the root logger.
         """
-        from aws.osml.data_intake.utils.logger import get_logger
+        with patch("logging.Logger.hasHandlers", return_value=False), patch("logging.basicConfig") as mock_basic_config:
+            logger = get_logger("test_logger", logging.DEBUG)
 
-        logger = get_logger("test_logger", logging.DEBUG)
+            mock_basic_config.assert_called_once_with(level=logging.DEBUG)
+            assert logger.name == "test_logger"
 
-        # Check that basicConfig was called correctly
-        mock_basic_config.assert_called_once_with(level=logging.DEBUG)
-
-        # Check that the logger returned has the correct name
-        self.assertEqual(logger.name, "test_logger")
-
-    @patch("logging.Logger.hasHandlers", return_value=True)
-    @patch("logging.basicConfig")
-    def test_logger_with_handlers(self, mock_basic_config, mock_has_handlers):
+    def test_logger_with_handlers(self):
         """
-        Test that basicConfig is called if handlers are present on the root logger.
+        Test that basicConfig is not called if handlers are present on the root logger.
         """
-        from aws.osml.data_intake.utils.logger import get_logger
+        with patch("logging.Logger.hasHandlers", return_value=True), patch("logging.basicConfig") as mock_basic_config:
+            logger = get_logger("test_logger", logging.DEBUG)
 
-        logger = get_logger("test_logger", logging.DEBUG)
-
-        # Check that basicConfig was not called
-        mock_basic_config.assert_not_called()
-
-        # Check that the logger returned has the correct name
-        self.assertEqual(logger.name, "test_logger")
+            mock_basic_config.assert_not_called()
+            assert logger.name == "test_logger"
 
     def test_configure_logger(self):
         """
         Test the configure_logger function.
         """
         from pythonjsonlogger.json import JsonFormatter
-
-        from aws.osml.data_intake.utils.logger import AsyncContextFilter, configure_logger
 
         logger = logging.getLogger("test_configure_logger")
 
@@ -55,26 +42,20 @@ class TestLambdaLogger(unittest.TestCase):
 
         configured_logger = configure_logger(logger, logging.INFO, log_formatter=formatter, log_filter=filter)
 
-        # Check if the StreamHandler was added
         stream_handler_exists = any(isinstance(handler, logging.StreamHandler) for handler in configured_logger.handlers)
-        self.assertTrue(stream_handler_exists)
+        assert stream_handler_exists
 
-        # Check if the formatter was set
         for handler in configured_logger.handlers:
             if isinstance(handler, logging.StreamHandler):
-                self.assertEqual(handler.formatter, formatter)
+                assert handler.formatter == formatter
 
-        # Check if the filter was added
-        self.assertIn(filter, configured_logger.filters)
-
-        self.assertFalse(configured_logger.propagate)
+        assert filter in configured_logger.filters
+        assert not configured_logger.propagate
 
     def test_async_context_filter(self):
         """
         Test the AsyncContextFilter class.
         """
-        from aws.osml.data_intake.utils.logger import _LOG_CONTEXT, AsyncContextFilter
-
         filter = AsyncContextFilter(attribute_names=["image_hash"])
 
         record = logging.LogRecord(
@@ -82,27 +63,20 @@ class TestLambdaLogger(unittest.TestCase):
         )
         _LOG_CONTEXT.set({"image_hash": "123456"})
 
-        self.assertTrue(filter.filter(record))
-        self.assertEqual(record.image_hash, "123456")
+        assert filter.filter(record)
+        assert record.image_hash == "123456"
 
-        # Test without context
         _LOG_CONTEXT.set({})
-        self.assertTrue(filter.filter(record))
-        self.assertIsNone(record.image_hash)
+        assert filter.filter(record)
+        assert record.image_hash is None
 
     def test_set_context(self):
         """
         Test the set_context static method of AsyncContextFilter.
         """
-        from aws.osml.data_intake.utils.logger import _LOG_CONTEXT, AsyncContextFilter
-
         context = {"key": "value"}
         AsyncContextFilter.set_context(context)
-        self.assertEqual(_LOG_CONTEXT.get(), context)
+        assert _LOG_CONTEXT.get() == context
 
         AsyncContextFilter.set_context(None)
-        self.assertEqual(_LOG_CONTEXT.get(), {})
-
-
-if __name__ == "__main__":
-    unittest.main()
+        assert _LOG_CONTEXT.get() == {}
